@@ -1,0 +1,128 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Файлы исходного кода">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Заголовочные файлы">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Файлы ресурсов">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Файлы исходного кода\RendererOgl">
+      <UniqueIdentifier>{c556638c-2d03-40db-b542-98c90d5f4704}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Заголовочные файлы\RendererOgl">
+      <UniqueIdentifier>{b09b19e8-a16d-4d2d-9855-61dd17bf2c4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Заголовочные файлы\Tools">
+      <UniqueIdentifier>{a8ce2a44-f70c-4b5e-8001-fc63095339d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы исходного кода\Tools">
+      <UniqueIdentifier>{df44d624-397a-4f1c-8200-e309a4811d5b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{32a092c8-e6b7-4954-b9bf-47d1097fc886}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Program.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
+    <ClCompile Include="Tools\FileTools.cpp">
+      <Filter>Файлы исходного кода\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraBase.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraControllable.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\Defaults.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\Types.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\Tools.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\TextureResource.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\ShaderResource.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\StaticGeometryResource.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\StaticMeshPart.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\StaticMesh.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\Light.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="RendererOgl\Renderer.cpp">
+      <Filter>Файлы исходного кода\RendererOgl</Filter>
+    </ClCompile>
+    <ClCompile Include="Controls.cpp">
+      <Filter>Файлы исходного кода</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Tools\FileTools.h">
+      <Filter>Заголовочные файлы\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraBase.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraControllable.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\Defaults.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\Types.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\Tools.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\TextureResource.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\ShaderResource.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\StaticGeometryResource.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\StaticMeshPart.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\StaticMesh.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\Light.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="RendererOgl\Renderer.h">
+      <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="Controls.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Shaders\basic.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

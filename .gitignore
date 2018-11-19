@@ -1,0 +1,13 @@
+Bin/*.exe
+Bin/Intermediates/
+*.opendb
+*.db
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.tlog
+*.log
+*.idb
+*.iobj
+*.ipdb
