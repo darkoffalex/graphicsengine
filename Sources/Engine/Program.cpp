@@ -224,14 +224,14 @@ void Load()
 		{ { 10.0f, 0.0f, 10.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
 		{ { -10.0f, 0.0f, 10.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,0.0f } },
 		{ { -10.0f,  0.0f, -10.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
-	}, { 0,1,2, 0,2,3 }, false, true, true);
+	}, { 0,1,2, 0,2,3 }, false, true, false);
 
 	_sceneResources.geometry.wall = ogl::MakeStaticGeometryResource({
 		{ { 5.0f, 5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
 		{ { 5.0f, -5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
 		{ { -5.0f, -5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,0.0f } },
 		{ { -5.0f, 5.0f,  0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
-	}, { 0,1,2, 0,2,3 }, false, true, true);
+	}, { 0,1,2, 0,2,3 }, false, true, false);
 
 	// Т Е К С Т У Р Ы
 
@@ -255,7 +255,7 @@ void Load()
 
 	// Текстура фонарика
 	stbi_set_flip_vertically_on_load(true);
-	textureBytes = stbi_load(ExeDir().append("..\\Textures\\flashlight-test.jpg").c_str(), &width, &height, &bpp, 3);
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\flashlight.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.flashLight = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 }
@@ -283,9 +283,12 @@ void Init(ogl::Renderer* pRenderer)
 	wallMesh->getParts()[0].bumpTexture.resource = _sceneResources.textures.wallBump;
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
+	//wallMesh->rotation.x = 45.0f;
+	//wallMesh->rotation.y = 20.0f;
+	//wallMesh->origin.y = -5.0f;
 
 	// Добавить источник света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -90.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,-0.5f,0.0f }, { -90.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
 	centralLight->render = true;
 }
 

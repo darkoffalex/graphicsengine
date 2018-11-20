@@ -135,6 +135,7 @@ namespace ogl
 		std::map<GLuint, std::string> shaderSources;
 		shaderSources[GL_VERTEX_SHADER] = "/*VERTEX-SHADER-BEGIN*/|/*VERTEX-SHADER-END*/";
 		shaderSources[GL_FRAGMENT_SHADER] = "/*FRAGMENT-SHADER-BEGIN*/|/*FRAGMENT-SHADER-END*/";
+		shaderSources[GL_GEOMETRY_SHADER] = "/*GEOMETRY-SHADER-BEGIN*/|/*GEOMETRY-SHADER-END*/";
 
 		// Поделить весь файл на куски относящиеся к соответствующим типам шейдеров
 		ShaderResource::splitCodeToMap(&shaderSources, source);

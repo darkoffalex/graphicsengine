@@ -18,14 +18,15 @@ struct TexMapping
 
 // Выходные значение (передаваемые фрагментому шейдеру)
 // Эти значения будут интерполированы от вершины к вершине для каждого фрагмента
-out vec3 vColor;              // Цвет
-out vec2 vTextCoordsDiffuse;  // Текстурные координаты (diffuse)
-out vec2 vTextCoordsDetail;   // Текстурные координаты (detail)
-out vec2 vTextCoordsSpecular; // Текстурные координаты (specular)
-out vec2 vTextCoordsBump;     // Текстурные координаты (bump)
-out vec3 vNormal;             // Нормаль
-out vec3 vFragmentPosition;   // Положение фрагмента
-out mat3 TBN;                 // Матрица для преобразования из касательного пространства в мировое
+out vec3 vsoColor;              // Цвет
+out vec2 vsoTextCoordsDiffuse;  // Текстурные координаты (diffuse)
+out vec2 vsoTextCoordsDetail;   // Текстурные координаты (detail)
+out vec2 vsoTextCoordsSpecular; // Текстурные координаты (specular)
+out vec2 vsoTextCoordsBump;     // Текстурные координаты (bump)
+out vec3 vsoNormal;             // Нормаль
+out vec3 vsoFragmentPosition;   // Положение вершины в мир. координатах (интерполируется для фрагментов)
+out vec3 vsoLocalPosition;      // Положение вершины (исходное, без трансформаций)
+out mat3 vsoNormalMatrix;       // Матрица преобразования нормалей (учет поворота и масштабирования)
 
 // Uniform-переменные
 uniform mat4 model;                    // Матрица модели (трансформация объекта)
@@ -42,34 +43,132 @@ void main()
 {
 	// Матрица преобразования нормалей
 	// Учитывает поворот и масштабирование объекта (в дальнейшем лучше вынести в основной код)
-	mat3 normalMatrix = mat3(transpose(inverse(model)));
+	vsoNormalMatrix = mat3(transpose(inverse(model)));
 
 	// Вершина подвергается преобразованием через матрицы
 	gl_Position = projection * view * model * vec4(position, 1.0);
 
 	// Цвет передается без изменений
-	vColor = color;
+	vsoColor = color;
 
 	// Текстурные для 4-ех типов текстур (diffuse, detail, specular, bump) передаются с учетом коэффициентов маппинга
-	vTextCoordsDiffuse = (texMappingDiffuse.rot * (uv - texMappingDiffuse.offset)) * texMappingDiffuse.scale + 2*texMappingDiffuse.offset;
-	vTextCoordsDetail = (texMappingDetail.rot * (uv - texMappingDetail.offset)) * texMappingDetail.scale + 2*texMappingDetail.offset;
-	vTextCoordsSpecular = (texMappingSpecular.rot * (uv - texMappingSpecular.offset)) * texMappingSpecular.scale + 2*texMappingSpecular.offset;
-	vTextCoordsBump = (texMappingBump.rot * (uv - texMappingBump.offset)) * texMappingBump.scale + 2*texMappingBump.offset;
+	vsoTextCoordsDiffuse = (texMappingDiffuse.rot * (uv - texMappingDiffuse.offset)) * texMappingDiffuse.scale + 2*texMappingDiffuse.offset;
+	vsoTextCoordsDetail = (texMappingDetail.rot * (uv - texMappingDetail.offset)) * texMappingDetail.scale + 2*texMappingDetail.offset;
+	vsoTextCoordsSpecular = (texMappingSpecular.rot * (uv - texMappingSpecular.offset)) * texMappingSpecular.scale + 2*texMappingSpecular.offset;
+	vsoTextCoordsBump = (texMappingBump.rot * (uv - texMappingBump.offset)) * texMappingBump.scale + 2*texMappingBump.offset;
 
 	// Нормаль подвергается преобразованию матрицы нормалей (частичная матрица модели, только вращения и масштаб)
-	vNormal = normalize(normalMatrix * normal);
+	vsoNormal = normalize(vsoNormalMatrix * normal);
 
 	// Положение подвергается преобразованию (нужны глобальные координаты)
-	vFragmentPosition = vec3(model * vec4(position, 1.0f));
+	vsoFragmentPosition = vec3(model * vec4(position, 1.0f));
 
-	// Построить матрицу касательного-глоабльного пространства
-	vec3 T = normalize(vec3(model * vec4(tangent,   0.0)));
-	vec3 B = cross(vNormal, T);
-	vec3 N = normalize(vec3(model * vec4(vNormal, 0.0)));
-	TBN = mat3(T,B,N);
+	// Исходное положение вершины
+	vsoLocalPosition = position;
 }
 /*VERTEX-SHADER-END*/
 
+////////////////////////////////////////////////////////////////////////////////////
+
+/*GEOMETRY-SHADER-BEGIN*/
+#version 330 core
+
+// На входе треугольники
+layout (triangles) in;
+// На выходе треугольники
+layout (triangle_strip, max_vertices = 3) out;
+
+// Интерполированные входные данные
+in vec3 vsoColor[];              // Цвет данного фрагмента
+in vec2 vsoTextCoordsDiffuse[];  // Текстурные координаты (diffuse)
+in vec2 vsoTextCoordsDetail[];   // Текстурные координаты (detail)
+in vec2 vsoTextCoordsSpecular[]; // Текстурные координаты (specular)
+in vec2 vsoTextCoordsBump[];     // Текстурные координаты (bump)
+in vec3 vsoNormal[];             // Нормаль от данного фрагмента
+in vec3 vsoFragmentPosition[];   // Положение вершины в мир. координатах (интерполируется для фрагментов)
+in vec3 vsoLocalPosition[];      // Положение вершины (исходное, без трансформаций)
+in mat3 vsoNormalMatrix[];       // Матрица преобразования нормалей (учет поворота и масштабирования)
+
+// Выходные параметры геом. шейдера
+out vec3 gsoColor;              // Цвет
+out vec2 gsoTextCoordsDiffuse;  // Текстурные координаты (diffuse)
+out vec2 gsoTextCoordsDetail;   // Текстурные координаты (detail)
+out vec2 gsoTextCoordsSpecular; // Текстурные координаты (specular)
+out vec2 gsoTextCoordsBump;     // Текстурные координаты (bump)
+out vec3 gsoNormal;             // Нормаль
+out vec3 gsoFragmentPosition;   // Положение фрагмента
+out mat3 gsoTBN;                // Матрица для преобразования из касательного пространства в мировое
+
+// Uniform-переменные
+uniform mat4 model;             // Матрица модели (трансформация объекта)
+
+// Подсчет тангента для полигона
+vec3 calcTangent();
+
+// Ориентировать тангент по нормали вершины
+vec3 OrthogonalizeTangent(vec3 tangent, vec3 vertexNormal);
+
+// Основная функция (подсчет TBN матрицы для карт нормалей)
+void main() 
+{
+	// Тангент полигона
+	vec3 polygonTangent = calcTangent();
+
+	// Пройтись по всем вершинам
+	for(int i = 0; i < 3; i++)
+	{
+		// Пропуск основных параметров во фрагментный шейдер как есть
+		gl_Position = gl_in[i].gl_Position;
+		gsoColor = vsoColor[i];
+		gsoTextCoordsDiffuse = vsoTextCoordsDiffuse[i];
+		gsoTextCoordsDetail = vsoTextCoordsDetail[i];
+		gsoTextCoordsSpecular = vsoTextCoordsSpecular[i];
+		gsoTextCoordsBump = vsoTextCoordsBump[i];
+		gsoNormal = vsoNormal[i];
+		gsoFragmentPosition = vsoFragmentPosition[i];
+
+		// Собрать TBN матрицу (касательного-мирового пространства)
+		vec3 T = OrthogonalizeTangent(vsoNormalMatrix[i] * polygonTangent, vsoNormal[i]);
+		vec3 B = cross(vsoNormal[i], T);
+		vec3 N = vsoNormal[i];
+		gsoTBN = mat3(T,B,N);
+
+		EmitVertex();
+	}
+	EndPrimitive();
+}
+
+// Подсчет тангента для полигона
+vec3 calcTangent()
+{
+	// Грани полигона в виде векторов
+	vec3 edge1 = vsoLocalPosition[1] - vsoLocalPosition[0];
+	vec3 edge2 = vsoLocalPosition[2] - vsoLocalPosition[0];
+
+	// Дельта UV для каждой грани
+	vec2 deltaUV1 = vsoTextCoordsBump[1] - vsoTextCoordsBump[0];
+	vec2 deltaUV2 = vsoTextCoordsBump[2] - vsoTextCoordsBump[0];
+
+	// Коэффициент для подсчета тангента
+	float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+	// Подсчитать и вернуть тангент
+	return normalize(vec3(
+		f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x),
+		f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y),
+		f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z)));
+}
+
+// Ориентировать тангент согласно нормали вершины
+vec3 OrthogonalizeTangent(vec3 tangent, vec3 vertexNormal)
+{
+	vec3 bitangent = cross(vertexNormal, tangent);
+	return cross(bitangent, vertexNormal);
+}
+
+/*GEOMETRY-SHADER-END*/
+
+////////////////////////////////////////////////////////////////////////////////////
 
 /*FRAGMENT-SHADER-BEGIN*/
 #version 330 core
@@ -80,14 +179,14 @@ void main()
 #define MAX_SPOT_LIGHTS 10
 
 // Интерполированные входные данные
-in vec3 vColor;              // Цвет данного фрагмента
-in vec2 vTextCoordsDiffuse;  // Текстурные координаты (diffuse)
-in vec2 vTextCoordsDetail;   // Текстурные координаты (detail)
-in vec2 vTextCoordsSpecular; // Текстурные координаты (specular)
-in vec2 vTextCoordsBump;     // Текстурные координаты (bump)
-in vec3 vNormal;             // Нормаль от данного фрагмента
-in vec3 vFragmentPosition;   // Положение данного фрагмента (абсолютное)
-in mat3 TBN;                 // Матрица для преобразования из касательного пространства в мировое
+in vec3 gsoColor;              // Цвет данного фрагмента
+in vec2 gsoTextCoordsDiffuse;  // Текстурные координаты (diffuse)
+in vec2 gsoTextCoordsDetail;   // Текстурные координаты (detail)
+in vec2 gsoTextCoordsSpecular; // Текстурные координаты (specular)
+in vec2 gsoTextCoordsBump;     // Текстурные координаты (bump)
+in vec3 gsoNormal;             // Нормаль от данного фрагмента
+in vec3 gsoFragmentPosition;   // Положение данного фрагмента (абсолютное)
+in mat3 gsoTBN;                 // Матрица для преобразования из касательного пространства в мировое
 
 // Описание материала
 struct Material
@@ -154,13 +253,13 @@ out vec4 color;
 void main()
 {
 	// Получить нормаль из карты нормалей (используя UV коордианты для текущего фрагмента)
-	vec3 normal = normalize(texture(bumpTexture,vTextCoordsBump).rgb * 2.0 - 1.0);
+	vec3 normal = normalize(texture(bumpTexture,gsoTextCoordsBump).rgb * 2.0 - 1.0);
 
 	// Перевести из скасательного в мировое пространство
-	normal = TBN * normal;
+	normal = gsoTBN * normal;
 
 	// Направление взгляда наблюдателя (на самом деле это вектор из фрагмента в направлении наблюдателя)
-	vec3 viewDir = normalize(eyePosition - vFragmentPosition);
+	vec3 viewDir = normalize(eyePosition - gsoFragmentPosition);
 
 	// Результирующий цвет
 	vec3 result;
@@ -181,7 +280,7 @@ void main()
 	}
 
 	// Итоговый цвет с учетом всех состовляющих (ambient,siffuse,specular), цветов вершин и текстурных координат
-	color = vec4(vColor * result, 1.0f);
+	color = vec4(gsoColor * result, 1.0f);
 }
 
 
@@ -189,21 +288,21 @@ void main()
 vec3 CalcPointLightComponents(PointLight light, vec3 normal, vec3 viewDir)
 {
 	// Коэффициент затухания (использует расстояние до источника, а так же спец-коэффициенты источника)
-	float distance = length(light.position - vFragmentPosition);
+	float distance = length(light.position - gsoFragmentPosition);
 	float attenuation = 1.0f / (1.0f + light.linear * distance + light.quadratic * (distance * distance));
 
 	// Фоновый (ambient) цвет просто равномерно заполняет каждый фрагмент
-	vec3 ambient = light.color * material.ambientColor * vec3(texture(diffuseTexture,vTextCoordsDiffuse));
+	vec3 ambient = light.color * material.ambientColor * vec3(texture(diffuseTexture,gsoTextCoordsDiffuse));
 
 	// Рассеянный (diffuse) зависит от угла между нормалью фрагмента и вектором падения света на фрагмент
-	vec3 lightDir = normalize(light.position - vFragmentPosition);
+	vec3 lightDir = normalize(light.position - gsoFragmentPosition);
 	float diffuseBrightness = max(dot(normal, lightDir), 0.0);
-	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,vTextCoordsDiffuse));
+	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,gsoTextCoordsDiffuse));
 
 	// Бликовый (specular) зависит от угла между вектором взгляда и отроженным относительно нормали вектором падения света на фрагмент
 	vec3 reflectedLightDir = reflect(-lightDir, normal);
 	float specularBrightness = pow(max(dot(viewDir, reflectedLightDir), 0.0), material.shininess);
-	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,vTextCoordsSpecular));
+	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,gsoTextCoordsSpecular));
 
 	return ((ambient * attenuation) + (diffuse * attenuation) + (specular * attenuation));
 }
@@ -212,17 +311,17 @@ vec3 CalcPointLightComponents(PointLight light, vec3 normal, vec3 viewDir)
 vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir)
 {
 	// Фоновый (ambient) цвет просто равномерно заполняет каждый фрагмент
-	vec3 ambient = light.color * material.ambientColor * vec3(texture(diffuseTexture,vTextCoordsDiffuse));
+	vec3 ambient = light.color * material.ambientColor * vec3(texture(diffuseTexture,gsoTextCoordsDiffuse));
 
 	// Рассеянный (diffuse) зависит от угла между нормалью фрагмента и вектором падения света на фрагмент
 	vec3 lightDir = normalize(light.direction);
 	float diffuseBrightness = max(dot(normal, -lightDir), 0.0);
-	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,vTextCoordsDiffuse));
+	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,gsoTextCoordsDiffuse));
 
 	// Бликовый (specular) зависит от угла между вектором взгляда и отроженным относительно нормали вектором падения света на фрагмент
 	vec3 reflectedLightDir = reflect(lightDir, normal); 
 	float specularBrightness = pow(max(dot(viewDir, reflectedLightDir), 0.0), material.shininess);
-	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,vTextCoordsSpecular));
+	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,gsoTextCoordsSpecular));
 
 	return (ambient + diffuse + specular);
 }
@@ -231,7 +330,7 @@ vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir
 vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir)
 {
 	// Вектор падения света на источник
-	vec3 lightDir = normalize(light.position - vFragmentPosition);
+	vec3 lightDir = normalize(light.position - gsoFragmentPosition);
 
 	// Косинус угла между вектором падения света и вектором направления источника
 	float thetaCos = dot(lightDir, normalize(-light.direction));
@@ -254,15 +353,15 @@ vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir)
 
 	// Рассеянный (diffuse)
 	float diffuseBrightness = max(dot(normal,lightDir), 0.0);
-	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,vTextCoordsDiffuse));
+	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * vec3(texture(diffuseTexture,gsoTextCoordsDiffuse));
 
 	// Бликовый (specular)
 	vec3 reflectedLightDir = reflect(-lightDir, normal);  
 	float specularBrightness = pow(max(dot(viewDir, reflectedLightDir), 0.0), material.shininess);
-	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,vTextCoordsSpecular));
+	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,gsoTextCoordsSpecular));
 
 	// Коэффициент затухания (использует расстояние до источника, а так же спец-коэффициенты источника)
-	float distance = length(light.position - vFragmentPosition);
+	float distance = length(light.position - gsoFragmentPosition);
 	float attenuation = 1.0f / (1.0f + light.linear * distance + light.quadratic * (distance * distance));
 
 	return ((diffuse * attenuation * intensity * texIntensity) + (specular * attenuation * intensity * texIntensity ));
