@@ -44,6 +44,8 @@ struct{
 		ogl::TextureResourcePtr wallSpecular;
 		ogl::TextureResourcePtr wallBump;
 
+		ogl::TextureResourcePtr grassDiffuse;
+
 		ogl::TextureResourcePtr flashLight;
 	} textures;
 
@@ -226,6 +228,13 @@ void Load()
 		{ { -10.0f,  0.0f, -10.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
 	}, { 0,1,2, 0,2,3 }, false, true, false);
 
+	// Геометрия используемая для кубов
+	_sceneResources.geometry.cube = ogl::MakeStaticGeometryResource(
+		ogl::defaults::GetVertices(ogl::defaults::DefaultGeometryType::CUBE, 1.0f), 
+		ogl::defaults::GetIndices(ogl::defaults::DefaultGeometryType::CUBE), 
+		false, true, false);
+
+	// Геометрия используемая для стены
 	_sceneResources.geometry.wall = ogl::MakeStaticGeometryResource({
 		{ { 5.0f, 5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
 		{ { 5.0f, -5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
@@ -244,7 +253,7 @@ void Load()
 	_sceneResources.textures.groundDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
-	// Текстура стены
+	// Текстуры стены
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
@@ -253,10 +262,16 @@ void Load()
 	_sceneResources.textures.wallBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
+	// Текстура травы
+	stbi_set_flip_vertically_on_load(true);
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\grass.png").c_str(), &width, &height, &bpp, 4);
+	_sceneResources.textures.grassDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), false);
+	stbi_image_free(textureBytes);
+
 	// Текстура фонарика
 	stbi_set_flip_vertically_on_load(true);
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\flashlight.jpg").c_str(), &width, &height, &bpp, 3);
-	_sceneResources.textures.flashLight = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	_sceneResources.textures.flashLight = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), false);
 	stbi_image_free(textureBytes);
 }
 
@@ -283,13 +298,27 @@ void Init(ogl::Renderer* pRenderer)
 	wallMesh->getParts()[0].bumpTexture.resource = _sceneResources.textures.wallBump;
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
-	//wallMesh->rotation.x = 45.0f;
-	//wallMesh->rotation.y = 20.0f;
-	//wallMesh->origin.y = -5.0f;
+
+	// Добавить к отрисовке куб
+	ogl::StaticMeshPtr cube = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
+	cube->position = { 0.0f,-0.75f,-1.0f };
+	cube->scale = { 0.5f,0.5f,0.5f };
+
+	// Добавить к отрисовке траву
+	ogl::StaticMeshPtr grassSprite = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.wall)));
+	grassSprite->getParts()[0].diffuseTexture.resource = _sceneResources.textures.grassDiffuse;
+	grassSprite->getParts()[0].diffuseTexture.wrapS = GL_CLAMP_TO_EDGE;
+	grassSprite->getParts()[0].diffuseTexture.wrapT = GL_CLAMP_TO_EDGE;
+	grassSprite->position = { 1.0f,-0.75f,-0.5f };
+	grassSprite->scale = { 0.05f,0.05f,0.05f };
 
 	// Добавить источник света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,-0.5f,0.0f }, { -90.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -90.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
 	centralLight->render = true;
+
+	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 }
 
 /**

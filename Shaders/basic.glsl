@@ -279,8 +279,17 @@ void main()
 		result += CalcSpotLightComponents(spotLights[i], normal, viewDir);
 	}
 
-	// Итоговый цвет с учетом всех состовляющих (ambient,siffuse,specular), цветов вершин и текстурных координат
-	color = vec4(gsoColor * result, 1.0f);
+	// Альфа-канал. Отвечает на смешивание цветов с уже имеющимися во фрейм-буфере. 
+	// Берется из diffuse текстуры через ее uv-координаты
+	float alpha = texture(diffuseTexture, gsoTextCoordsDiffuse).a;
+
+	// Если альфа канал очень мал - отбросить этот фрагмент
+	if(alpha < 0.01f){
+		discard;
+	}
+
+	// Итоговый цвет с учетом всех составляющих (ambient,siffuse,specular)
+	color = vec4(gsoColor * result, alpha);
 }
 
 
