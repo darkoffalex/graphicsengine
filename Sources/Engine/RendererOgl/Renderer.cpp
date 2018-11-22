@@ -10,15 +10,80 @@ namespace ogl
 	extern bool _isGlewInitialised;
 
 	/**
+	* \brief Инициализация кадрового буфера
+	* \param width Ширина буфера
+	* \param height Высота буфера
+	*/
+	void Renderer::initFrameBuffer(GLuint width, GLuint height)
+	{
+		// Сохранить размеры в структуре
+		this->frameBuffer_.sizes = { width,height };
+
+		// Создать объект текстуры для цветового вложения фрейм-буфера
+		glGenTextures(1, &(this->frameBuffer_.colorAttachmentId));
+		glBindTexture(GL_TEXTURE_2D, this->frameBuffer_.colorAttachmentId);
+		// Выделить текстурную память нужного размера
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameBuffer_.sizes.x, frameBuffer_.sizes.y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+		// Фильтрация (линейная)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Отвязать текустуру (завершаем работу с текстурой)
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		// Создание буфера глубины-трафарета (используем render-буфер, не текстуру, т.к. выборка в шейдере не нужна)
+		glGenRenderbuffers(1, &(this->frameBuffer_.depthStencilAttachmentId));
+		glBindRenderbuffer(GL_RENDERBUFFER, this->frameBuffer_.depthStencilAttachmentId);
+		// Выделить необходимое кол-во памяти
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, frameBuffer_.sizes.x, frameBuffer_.sizes.y);
+		// Отвязать render-буфер
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+		// Создать объект фрейм-буфера и привязать его (работаем с фрейм-буфером)
+		glGenFramebuffers(1, &(this->frameBuffer_.fboId));
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
+		// Привязать текстуру к кадровому буферу в качестве нулевого цветового вложения
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameBuffer_.colorAttachmentId, 0);
+		// Привязать render-буфер глубины-трафарета в качестве вложения глубины трафарета
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, frameBuffer_.depthStencilAttachmentId);
+
+		// Если фрейм-буфер не готов
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			throw std::runtime_error("OpenGL:Renderer: Frame buffer can't be initialized");
+		}
+
+		// Прекращаем работу с фрейм-буфером
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	/**
+	 * \brief Де-инициализация кадрового буффера
+	 */
+	void Renderer::freeFrameBuffer()
+	{
+		// Удалить все объекты буферов
+		glDeleteFramebuffers(1, &(this->frameBuffer_.fboId));
+		glDeleteRenderbuffers(1, &(this->frameBuffer_.depthStencilAttachmentId));
+		glDeleteTextures(1, &(this->frameBuffer_.colorAttachmentId));
+
+		// Обнулить идентификаторы и прочие значения
+		this->frameBuffer_.fboId = 0;
+		this->frameBuffer_.depthStencilAttachmentId = 0;
+		this->frameBuffer_.colorAttachmentId = 0;
+		this->frameBuffer_.sizes = {};
+	}
+
+	/**
 	* \brief Конструктор
 	* \param hwnd Хендл WinAPI окна
 	* \param shaderBasic Основной шейдер
+	* \param shaderPostProcessing Шейдер для пост-обработки
 	*/
-	Renderer::Renderer(HWND hwnd, ShaderResourcePtr shaderBasic) :
+	Renderer::Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing) :
 		hwnd_(hwnd),
 		viewMatrix_(glm::mat4(1)),
 		projectionMatrix_(glm::mat4(1)),
 		shaderBasic_(shaderBasic),
+		shaderPostProc_(shaderPostProcessing),
 		cameraPosition(glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		// Получение размеров области вида
@@ -37,11 +102,11 @@ namespace ogl
 			throw std::runtime_error("OpenGL:Renderer: Glew is not initialised");
 		}
 
+		// Инициализация фрейм-буфера для пост-процессинга
+		this->initFrameBuffer(this->viewPort.width, this->viewPort.height);
+
 		// Установка размеров области вида
 		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
-
-		// Включить тест глубины
-		glEnable(GL_DEPTH_TEST);
 
 		// Передними считаются грани описаные по часовой стрелке
 		glFrontFace(GL_CW);
@@ -82,9 +147,20 @@ namespace ogl
 			defaults::GetVertices(defaults::DefaultGeometryType::CUBE, 0.1f), 
 			defaults::GetIndices(defaults::DefaultGeometryType::CUBE));
 
+		this->defaultGeometry_.quad = MakeStaticGeometryResource(
+			defaults::GetVertices(defaults::DefaultGeometryType::PLANE, 2.0f),
+			defaults::GetIndices(defaults::DefaultGeometryType::PLANE));
 
 		// Шейдер по умолчанию для объектов сплошного цвета
 		this->shaderSolidColor_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SOLID_COLORED));
+	}
+
+	/**
+	* \brief Освобождение памяти
+	*/
+	Renderer::~Renderer()
+	{
+		this->freeFrameBuffer();
 	}
 
 	/**
@@ -200,13 +276,22 @@ namespace ogl
 			throw std::runtime_error("OpenGL:Renderer: Glew is not initialised");
 		}
 
+		// П Р О Х О Д - 1
+
+		// Активировать фрейм-буфер (рендеринг осуществляется в данный фрейм-буффер)
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
+
 		// Установка параметров очистки экрана
 		glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
 		glClear(clearMask);
 
+		// Включить тест глубины
+		glEnable(GL_DEPTH_TEST);
+
 		// Идентификаторы основных шейдеров
 		GLuint solidColorShaderID = this->shaderSolidColor_->getId();
 		GLuint basicShaderID = this->shaderBasic_->getId();
+		GLuint postProcShaderID = this->shaderPostProc_->getId();
 
 		// Использовать однотонный шейдер
 		glUseProgram(solidColorShaderID);
@@ -415,6 +500,34 @@ namespace ogl
 				glBindVertexArray(0);
 			}
 		}
+
+
+		// П Р О Х О Д - 2
+
+		// Активировать фрейм-буфер окна (рендеринг на поверхность окна)
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// Установка параметров очистки экрана (белый фон, очищать только цвет, отключить тест глубины)
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glDisable(GL_DEPTH_TEST);
+
+		// Использовать шейдер пост-обработки
+		glUseProgram(postProcShaderID);
+
+		// Привязать VAO (геометрия квадрата)
+		glBindVertexArray(this->defaultGeometry_.quad->getVaoId());
+
+		// Нацепить текстуру фреймбуфера на квадрат
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, this->frameBuffer_.colorAttachmentId);
+		glUniform1i(glGetUniformLocation(postProcShaderID, "screenTexture"), 0);
+
+		// Отрисовать VAO
+		glDrawElements(GL_TRIANGLES, this->defaultGeometry_.quad->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+
+		// Отвязать VAO
+		glBindVertexArray(0);
 
 		// Смена буферов
 		SwapBuffers(GetDC(this->hwnd_));

@@ -30,6 +30,7 @@ struct{
 	// Шейдеры
 	struct {
 		ogl::ShaderResourcePtr basicShader;
+		ogl::ShaderResourcePtr postProcessing;
 	} shaders;
 
 	// Текстуры
@@ -142,7 +143,7 @@ int main(int argc, char* argv[])
 		Load();
 
 		// Создать рендерер
-		_pRenderer = new ogl::Renderer(hWnd, _sceneResources.shaders.basicShader);
+		_pRenderer = new ogl::Renderer(hWnd, _sceneResources.shaders.basicShader, _sceneResources.shaders.postProcessing);
 
 		// Создать камеру
 		_pCamera = new CameraControllable(1.5f, 0.3f, _pRenderer->viewPort.getAspectRatio());
@@ -214,9 +215,13 @@ void Load()
 {
 	// Ш Е Й Д Е Р Ы
 
-	// Загрузить шейдер по умолчанию
+	// Загрузить основной шейдер
 	std::string shaderSource = LoadStringFromFile(ShadersDir().append("basic.glsl"));
 	_sceneResources.shaders.basicShader = ogl::MakeShaderResource(shaderSource);
+
+	// Загрузить шейдер для пост-процессинга
+	shaderSource = LoadStringFromFile(ShadersDir().append("post-processing.glsl"));
+	_sceneResources.shaders.postProcessing = ogl::MakeShaderResource(shaderSource);
 
 	// Г Е О М Е Т Р И Я
 
@@ -327,7 +332,7 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
-	_pRenderer->getLights()[0]->rotation.x += 0.05f * frameDeltaMs;
+	_pRenderer->getLights()[0]->rotation.x += 0.1f * frameDeltaMs;
 
 	// Если есть камера
 	if(_pCamera != nullptr)

@@ -45,6 +45,13 @@ namespace ogl
 			{ { (size / 2),  -(size / 2), -(size / 2) },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
 		};
 
+		vertices[DefaultGeometryType::PLANE] = {
+			{ { (size / 2), (size / 2), 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
+			{ { (size / 2), -(size / 2), 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
+			{ { -(size / 2), -(size / 2), 0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,0.0f } },
+			{ { -(size / 2), (size / 2),  0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
+		};
+
 		auto it = vertices.find(type);
 
 		if (it == vertices.end()) return{};
@@ -68,6 +75,10 @@ namespace ogl
 			12,13,14, 12,14,15,
 			16,17,18, 16,18,19,
 			20,21,22, 20,22,23,
+		};
+
+		indices[DefaultGeometryType::PLANE] = {
+			0,1,2, 0,2,3,
 		};
 
 		auto it = indices.find(type);

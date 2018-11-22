@@ -124,5 +124,8 @@
     <None Include="..\..\Shaders\basic.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="..\..\Shaders\post-processing.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

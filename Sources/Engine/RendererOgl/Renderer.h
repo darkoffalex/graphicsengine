@@ -26,7 +26,15 @@ namespace ogl
 		glm::mat4 projectionMatrix_;         // Матрица проекции
 
 		ShaderResourcePtr shaderSolidColor_; // Шейдер для однотонных объектов
-		ShaderResourcePtr shaderBasic_;      // Щейдер для основного освещения
+		ShaderResourcePtr shaderBasic_;      // Шейдер для основного освещения
+		ShaderResourcePtr shaderPostProc_;   // Шейдер для пост-обработки
+
+		struct{
+			GLuint fboId;
+			GLuint depthStencilAttachmentId;
+			GLuint colorAttachmentId;
+			glm::ivec2 sizes;
+		} frameBuffer_;
 
 		/**
 		 * \brief Текстурные ресурсы по умолчанию
@@ -49,6 +57,7 @@ namespace ogl
 			StaticGeometryResourcePtr cube;
 			StaticGeometryResourcePtr cilinder;
 			StaticGeometryResourcePtr sphere;
+			StaticGeometryResourcePtr quad;
 		} defaultGeometry_;
 
 		std::vector<StaticMeshPtr> staticMeshes_;  // Массив статических мешей (указателей)
@@ -65,6 +74,18 @@ namespace ogl
 		* \param other Ссылка на копируемый объекта
 		*/
 		void Renderer::operator=(const Renderer& other) = delete;
+
+		/**
+		 * \brief Инициализация кадрового буфера
+		 * \param width Ширина буфера
+		 * \param height Высота буфера
+		 */
+		void initFrameBuffer(GLuint width, GLuint height);
+
+		/**
+		 * \brief Де-инициализация кадрового буффера
+		 */
+		void freeFrameBuffer();
 
 	public:
 		/**
@@ -92,13 +113,14 @@ namespace ogl
 		 * \brief Конструктор
 		 * \param hwnd Хендл WinAPI окна
 		 * \param shaderBasic Основной шейдер
+		 * \param shaderPostProcessing Шейдер для пост-обработки
 		 */
-		Renderer(HWND hwnd, ShaderResourcePtr shaderBasic);
+		Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing);
 
 		/**
-		 * \brief Деструктор
+		 * \brief Освобождение памяти
 		 */
-		~Renderer() = default;
+		~Renderer();
 
 		/**
 		 * \brief Установить матрицу вида
