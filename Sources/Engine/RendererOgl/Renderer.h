@@ -177,6 +177,6 @@ namespace ogl
 		 * \param clearColor Цвет очистки кадра
 		 * \param clearMask Параметры очистки
 		 */
-		void drawFrame(glm::vec4 clearColor = { 0.0f,0.0f,0.0f,1.0f }, GLbitfield clearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		void drawFrame(glm::vec4 clearColor = { 0.0f,0.0f,0.0f,1.0f }, GLbitfield clearMask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	};
 }

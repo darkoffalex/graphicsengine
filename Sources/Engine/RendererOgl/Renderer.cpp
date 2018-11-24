@@ -108,23 +108,27 @@ namespace ogl
 		// Установка размеров области вида
 		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
 
-		// Передними считаются грани описаные по часовой стрелке
-		glFrontFace(GL_CW);
 
-		// Включить отсеение граней
-		glEnable(GL_CULL_FACE);
-
-		// Включить режим смешивания цветов
+		// Включить режим смешивания цветов (по умолчанию)
 		glEnable(GL_BLEND);
-
-		// Функция смешивания
+		// Функция смешивания (по умолчанию)
 		// Цвет, который накладывается поверх другого, множится на свой альфа-канал
 		// Цвет, на который накладывается другой цвет, множится на единицу минус альфа канал наложенного цвета
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		// Значения цветов при наложении складываются
+		// Значения цветов при смешивании (наложении) складываются
 		glBlendEquation(GL_FUNC_ADD);
 
+		// В ключить тест трафарета (по умолчанию)
+		glEnable(GL_STENCIL_TEST);
+		// Если тест трафарета и тест глубины пройден - заменить значение эталоном сравнения из glStencilFunc (поведение по умолч.)
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		// Тест трафарета считается пройденым, если значение у фрагмента равно единице (по умолчанию)
+		glStencilFunc(GL_EQUAL, 1, 0xFF);
+
+		// Передними считаются грани описаные по часовой стрелке
+		glFrontFace(GL_CW);
+		// Включить отсечение граней
+		glEnable(GL_CULL_FACE);
 		// Отсекать задние грани
 		glCullFace(GL_BACK);
 
@@ -293,8 +297,14 @@ namespace ogl
 		GLuint basicShaderID = this->shaderBasic_->getId();
 		GLuint postProcShaderID = this->shaderPostProc_->getId();
 
+		// с и с т е м н ы е  о б ъ е к т ы
+
+		// Рисование системных объектов (источники света и прочее)
 		// Использовать однотонный шейдер
 		glUseProgram(solidColorShaderID);
+
+		// Включить тест трафарета
+		glEnable(GL_STENCIL_TEST);
 
 		// Проход по всем источникам освещения для их отображения
 		for (auto light : this->lights_)
@@ -305,6 +315,12 @@ namespace ogl
 				// Передача матриц проекции и вида в шейдер
 				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
 				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
+
+				// о б ъ е к т
+
+				// Тест будет пройден в любом случае (какое бы значение не было в буфере)
+				// После прохождения теста в буфер будет внесено значение 1 (поведение из glStencilOp)
+				glStencilFunc(GL_ALWAYS, 1, 0xFF);
 
 				// Матрица модели
 				glm::mat4 mdodelMatrix = light->getModelMatrix();
@@ -317,18 +333,43 @@ namespace ogl
 				glBindVertexArray(this->defaultGeometry_.cube->getVaoId());
 				glDrawElements(GL_TRIANGLES, this->defaultGeometry_.cube->getIndexCount(), GL_UNSIGNED_INT, nullptr);
 				glBindVertexArray(0);
+
+				// о б в о д к а
+
+				// Тест считается пройденным если в буфере не 1
+				// После прохождения теста в буфер будет внесено значение 1 (поведение из glStencilOp)
+				glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+
+				// Матрица модели (чуть увеличенный вариант)
+				mdodelMatrix = light->getModelMatrix(1.1f);
+				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
+
+				// Передать цвет
+				glm::vec3 green = {0.2f,1.0f,0.0f};
+				glUniform3fv(glGetUniformLocation(solidColorShaderID, "lightColor"), 1, glm::value_ptr(green));
+
+				// Привязать VAO
+				glBindVertexArray(this->defaultGeometry_.cube->getVaoId());
+				glDrawElements(GL_TRIANGLES, this->defaultGeometry_.cube->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+				glBindVertexArray(0);
 			}
 		}
 
+		// о с н о в н ы е  о б ъ е к т ы
+
+		// Рисование основной сцены
 		// Использовать основной шейдер
 		glUseProgram(basicShaderID);
+
+		// Для основной сцены тест трафарета не производится
+		glDisable(GL_STENCIL_TEST);
 
 		// Кол-во обработанных источников всех типов
 		unsigned pointLigths = 0;
 		unsigned directionalLights = 0;
 		unsigned spotLights = 0;
 
-		// Проход по всем источникам освещения для передачи их в данных в шейдер
+		// Проход по всем источникам освещения для передачи их данных в шейдер
 		for (auto light : this->lights_)
 		{
 			// Для точечных источников
@@ -511,6 +552,7 @@ namespace ogl
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
 
 		// Использовать шейдер пост-обработки
 		glUseProgram(postProcShaderID);
