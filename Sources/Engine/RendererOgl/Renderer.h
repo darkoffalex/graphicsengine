@@ -9,6 +9,7 @@
 
 #include "ShaderResource.h"
 #include "TextureResource.h"
+#include "TextureCubicResource.h"
 #include "StaticMesh.h"
 #include "Light.h"
 
@@ -26,6 +27,7 @@ namespace ogl
 		glm::mat4 projectionMatrix_;         // Матрица проекции
 
 		ShaderResourcePtr shaderSolidColor_; // Шейдер для однотонных объектов
+		ShaderResourcePtr shaderSkybox_;     // Шейдер для рендеринга скайбокса
 		ShaderResourcePtr shaderBasic_;      // Шейдер для основного освещения
 		ShaderResourcePtr shaderPostProc_;   // Шейдер для пост-обработки
 
@@ -58,6 +60,7 @@ namespace ogl
 			StaticGeometryResourcePtr cilinder;
 			StaticGeometryResourcePtr sphere;
 			StaticGeometryResourcePtr quad;
+			StaticGeometryResourcePtr skybox;
 		} defaultGeometry_;
 
 		std::vector<StaticMeshPtr> staticMeshes_;  // Массив статических мешей (указателей)
@@ -92,6 +95,11 @@ namespace ogl
 		 * \brief Текстура пятен фонарика
 		 */
 		TextureResourcePtr flashLightTexture;
+
+		/**
+		 * \brief Текстура фонового скай-бокса
+		 */
+		TextureCubicResourcePtr backgroundTexture;
 
 		/**
 		 * \brief Ширина и высота области вида

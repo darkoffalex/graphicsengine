@@ -16,6 +16,7 @@ namespace ogl
 		{
 			PLANE,
 			CUBE,
+			CUBE_SKYBOX,
 			PYRAMID,
 			SPHERE
 		};
@@ -40,6 +41,7 @@ namespace ogl
 		{
 			SOLID_COLORED,
 			FULL_BRIGHT_TEXTURED,
+			SKYBOX
 		};
 
 		/**

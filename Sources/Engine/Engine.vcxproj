@@ -30,6 +30,7 @@
     <ClCompile Include="RendererOgl\StaticGeometryResource.cpp" />
     <ClCompile Include="RendererOgl\StaticMesh.cpp" />
     <ClCompile Include="RendererOgl\StaticMeshPart.cpp" />
+    <ClCompile Include="RendererOgl\TextureCubicResource.cpp" />
     <ClCompile Include="RendererOgl\TextureResource.cpp" />
     <ClCompile Include="RendererOgl\Tools.cpp" />
     <ClCompile Include="RendererOgl\Types.cpp" />
@@ -46,6 +47,7 @@
     <ClInclude Include="RendererOgl\StaticGeometryResource.h" />
     <ClInclude Include="RendererOgl\StaticMesh.h" />
     <ClInclude Include="RendererOgl\StaticMeshPart.h" />
+    <ClInclude Include="RendererOgl\TextureCubicResource.h" />
     <ClInclude Include="RendererOgl\TextureResource.h" />
     <ClInclude Include="RendererOgl\Tools.h" />
     <ClInclude Include="RendererOgl\Types.h" />

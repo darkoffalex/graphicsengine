@@ -155,8 +155,14 @@ namespace ogl
 			defaults::GetVertices(defaults::DefaultGeometryType::PLANE, 2.0f),
 			defaults::GetIndices(defaults::DefaultGeometryType::PLANE));
 
+		this->defaultGeometry_.skybox = MakeStaticGeometryResource(
+			defaults::GetVertices(defaults::DefaultGeometryType::CUBE_SKYBOX),
+			{});
+
 		// Шейдер по умолчанию для объектов сплошного цвета
 		this->shaderSolidColor_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SOLID_COLORED));
+		// Шейдер по умолчанию для скайбокса
+		this->shaderSkybox_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SKYBOX));
 	}
 
 	/**
@@ -296,12 +302,48 @@ namespace ogl
 		GLuint solidColorShaderID = this->shaderSolidColor_->getId();
 		GLuint basicShaderID = this->shaderBasic_->getId();
 		GLuint postProcShaderID = this->shaderPostProc_->getId();
+		GLuint skyboxShaderID = this->shaderSkybox_->getId();
+
+		// с к а й - б о к с
+		if(this->backgroundTexture != nullptr)
+		{
+			// Рисование скайбоксы
+			// Использовать соответствующий шейдер
+			glUseProgram(skyboxShaderID);
+
+			// Чтобы скайбокс был статичен относительно камеры из видовой матрицы нужно убрать данные о перемещении
+			glm::mat4 viewSkybox = glm::mat4(glm::mat3(this->viewMatrix_));
+
+			// Передача матриц проекции и вида в шейдер
+			glUniformMatrix4fv(glGetUniformLocation(skyboxShaderID, "view"), 1, GL_FALSE, glm::value_ptr(viewSkybox));
+			glUniformMatrix4fv(glGetUniformLocation(skyboxShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
+
+			// Выключить тест глубины
+			glDisable(GL_DEPTH_TEST);
+
+			// Привязать VAO скайбокса
+			glBindVertexArray(this->defaultGeometry_.skybox->getVaoId());
+			glDrawArrays(GL_TRIANGLES, 0, this->defaultGeometry_.skybox->getVertexCount());
+			// Применить текстуру скайбокса
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, this->backgroundTexture->getId());
+			glUniform1i(glGetUniformLocation(skyboxShaderID, "skybox"), 0);
+			// Отвязать VAO
+			glBindVertexArray(0);
+
+			// Включить тест глубины обратно
+			glEnable(GL_DEPTH_TEST);
+		}
 
 		// с и с т е м н ы е  о б ъ е к т ы
 
 		// Рисование системных объектов (источники света и прочее)
 		// Использовать однотонный шейдер
 		glUseProgram(solidColorShaderID);
+
+		// Передача матриц проекции и вида в шейдер
+		glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
+		glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
 
 		// Включить тест трафарета
 		glEnable(GL_STENCIL_TEST);
@@ -312,10 +354,6 @@ namespace ogl
 			// Если источник света должен быть отображен
 			if (light->render)
 			{
-				// Передача матриц проекции и вида в шейдер
-				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
-				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
-
 				// о б ъ е к т
 
 				// Тест будет пройден в любом случае (какое бы значение не было в буфере)
@@ -345,8 +383,8 @@ namespace ogl
 				glUniformMatrix4fv(glGetUniformLocation(solidColorShaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
 
 				// Передать цвет
-				glm::vec3 green = {0.2f,1.0f,0.0f};
-				glUniform3fv(glGetUniformLocation(solidColorShaderID, "lightColor"), 1, glm::value_ptr(green));
+				glm::vec3 col = {1.0f,0.68f,0.0f};
+				glUniform3fv(glGetUniformLocation(solidColorShaderID, "lightColor"), 1, glm::value_ptr(col));
 
 				// Привязать VAO
 				glBindVertexArray(this->defaultGeometry_.cube->getVaoId());

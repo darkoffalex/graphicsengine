@@ -52,6 +52,50 @@ namespace ogl
 			{ { -(size / 2), (size / 2),  0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
 		};
 
+		vertices[DefaultGeometryType::CUBE_SKYBOX] = {
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f,  1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+
+			{ { -1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f, -1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { 1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+			{ { -1.0f, -1.0f,  1.0f },{ 1.0f,1.0f,1.0f } },
+		};
+
 		auto it = vertices.find(type);
 
 		if (it == vertices.end()) return{};
@@ -169,6 +213,23 @@ namespace ogl
 				"out vec4 color;\n"
 				"uniform vec3 lightColor;\n"
 				"void main(){color = vec4(lightColor, 1.0f);}\n"
+				"/*FRAGMENT-SHADER-END*/\n";
+		case ogl::defaults::DefaultShaderType::SKYBOX:
+			return
+				"/*VERTEX-SHADER-BEGIN*/\n"
+				"#version 330 core\n"
+				"layout (location = 0) in vec3 aPos;\n"
+				"out vec3 TexCoords;\n"
+				"uniform mat4 view;\n"
+				"uniform mat4 projection;\n"
+				"void main(){TexCoords = aPos; gl_Position = projection * view * vec4(aPos, 1.0);}\n"
+				"/*VERTEX-SHADER-END*/\n"
+				"/*FRAGMENT-SHADER-BEGIN*/\n"
+				"#version 330 core\n"
+				"in vec3 TexCoords;\n"
+				"out vec4 FragColor;\n"
+				"uniform samplerCube skybox;\n"
+				"void main(){FragColor = texture(skybox, TexCoords);}\n"
 				"/*FRAGMENT-SHADER-END*/\n";
 		}
 	}

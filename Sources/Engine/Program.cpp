@@ -48,6 +48,8 @@ struct{
 		ogl::TextureResourcePtr grassDiffuse;
 
 		ogl::TextureResourcePtr flashLight;
+
+		ogl::TextureCubicResourcePtr background;
 	} textures;
 
 	// Геометрия
@@ -278,6 +280,23 @@ void Load()
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\flashlight.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.flashLight = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), false);
 	stbi_image_free(textureBytes);
+
+
+	// Текстура фона (кубическая карта скай-бокса)
+	stbi_set_flip_vertically_on_load(false);
+	std::vector<ogl::TextureCubicInitFace> faces(6);
+	faces[0].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posx.jpg").c_str(), &(faces[0].width), &(faces[0].height), &(faces[0].bpp), 3); // Право
+	faces[1].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negx.jpg").c_str(), &(faces[1].width), &(faces[1].height), &(faces[1].bpp), 3); // Лево
+	faces[2].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posy.jpg").c_str(), &(faces[2].width), &(faces[2].height), &(faces[2].bpp), 3); // Верх
+	faces[3].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negy.jpg").c_str(), &(faces[3].width), &(faces[3].height), &(faces[3].bpp), 3); // Низ
+	faces[4].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posz.jpg").c_str(), &(faces[4].width), &(faces[4].height), &(faces[4].bpp), 3); // Перед
+	faces[5].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negz.jpg").c_str(), &(faces[5].width), &(faces[5].height), &(faces[5].bpp), 3); // Зад
+
+	_sceneResources.textures.background = ogl::MakeTextureCubicResource(faces, false);
+	
+	for(int i = 0; i < 6; i++){
+		stbi_image_free(faces[i].textureData);
+	}
 }
 
 /**
@@ -288,6 +307,8 @@ void Init(ogl::Renderer* pRenderer)
 {
 	// Добавить текстуру фонарика
 	_pRenderer->flashLightTexture = _sceneResources.textures.flashLight;
+	// Добавить текстуру фона (скайбокс)
+	_pRenderer->backgroundTexture = _sceneResources.textures.background;
 
 	// Добавить к отрисовке пол, настроить его текстуру и положение
 	ogl::StaticMeshPtr groundMesh = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.ground)));
