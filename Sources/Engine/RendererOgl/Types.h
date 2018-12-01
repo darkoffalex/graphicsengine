@@ -60,4 +60,16 @@ namespace ogl
 		glm::vec3 specularColor; // Цвет бликов
 		GLfloat shininess;       // Коэффициент размера бликового пятна (меньше - больше)
 	};
+
+	/**
+	 * \brief Идентификаторы фрейм-буфера
+	 */
+	struct FrameBuffer
+	{
+		GLuint fboId;                     // ID
+		GLuint depthStencilAttachmentId;  // Вложение глубины-трафарета (буфер глубины трафарета)
+		GLuint colorAttachmentId;         // Вложение цвета (цветовой буфер, картинка)
+		glm::ivec2 sizes;                 // Размеры (ширина высота)
+		GLuint samples;                   // Кол-во семплов (используется при мульти-семплинге)
+	};
 }

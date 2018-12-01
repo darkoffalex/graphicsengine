@@ -31,12 +31,13 @@ namespace ogl
 		ShaderResourcePtr shaderBasic_;      // Шейдер для основного освещения
 		ShaderResourcePtr shaderPostProc_;   // Шейдер для пост-обработки
 
-		struct{
-			GLuint fboId;
-			GLuint depthStencilAttachmentId;
-			GLuint colorAttachmentId;
-			glm::ivec2 sizes;
-		} frameBuffer_;
+		bool enableMSAA_;                    // Включить MSAA
+
+		// При постпроцессинге нельзя будет использовать картинку из MSAA буфера, поэтому
+		// ее нужно будет "ужать" до размеров обычного буфера и передать в обычный буфер,
+		// поэтому обычный (не MSAA) буфер нужно создать в любом случае (используется сглаживание или нет)
+		FrameBuffer frameBuffer_;            // Буфер кадра
+		FrameBuffer frameBufferMSAA_;        // Буфер кадра с учетом мульти-семплинга
 
 		/**
 		 * \brief Текстурные ресурсы по умолчанию
@@ -82,8 +83,10 @@ namespace ogl
 		 * \brief Инициализация кадрового буфера
 		 * \param width Ширина буфера
 		 * \param height Высота буфера
+		 * \param multisampling Создавать буфер для с учетом мульти-семплинга (сглаживание)
+		 * \param samples Кол-во точек подвыборки на каждый пиксель
 		 */
-		void initFrameBuffer(GLuint width, GLuint height);
+		void initFrameBuffer(GLuint width, GLuint height, bool multisampling = false, GLuint samples = 2);
 
 		/**
 		 * \brief Де-инициализация кадрового буффера
@@ -122,8 +125,10 @@ namespace ogl
 		 * \param hwnd Хендл WinAPI окна
 		 * \param shaderBasic Основной шейдер
 		 * \param shaderPostProcessing Шейдер для пост-обработки
+		 * \param msaa Активировать мульти-семплинг
+		 * \param samples Кол-во семплов (если используется мульти-семплинг)
 		 */
-		Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing);
+		Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing, bool msaa = false, GLuint samples = 2);
 
 		/**
 		 * \brief Освобождение памяти

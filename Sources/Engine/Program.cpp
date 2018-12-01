@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
 		Load();
 
 		// Создать рендерер
-		_pRenderer = new ogl::Renderer(hWnd, _sceneResources.shaders.basicShader, _sceneResources.shaders.postProcessing);
+		_pRenderer = new ogl::Renderer(hWnd, _sceneResources.shaders.basicShader, _sceneResources.shaders.postProcessing, true, 4);
 
 		// Создать камеру
 		_pCamera = new CameraControllable(1.5f, 0.3f, _pRenderer->viewPort.getAspectRatio());
@@ -291,9 +291,7 @@ void Load()
 	faces[3].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negy.jpg").c_str(), &(faces[3].width), &(faces[3].height), &(faces[3].bpp), 3); // Низ
 	faces[4].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posz.jpg").c_str(), &(faces[4].width), &(faces[4].height), &(faces[4].bpp), 3); // Перед
 	faces[5].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negz.jpg").c_str(), &(faces[5].width), &(faces[5].height), &(faces[5].bpp), 3); // Зад
-
 	_sceneResources.textures.background = ogl::MakeTextureCubicResource(faces, false);
-	
 	for(int i = 0; i < 6; i++){
 		stbi_image_free(faces[i].textureData);
 	}

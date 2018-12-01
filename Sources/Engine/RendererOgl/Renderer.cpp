@@ -13,11 +13,21 @@ namespace ogl
 	* \brief Инициализация кадрового буфера
 	* \param width Ширина буфера
 	* \param height Высота буфера
+	* \param multisampling Создавать буфер для с учетом мульти-семплинга (сглаживание)
+	* \param samples Кол-во точек подвыборки (семплов) на каждый пиксель
 	*/
-	void Renderer::initFrameBuffer(GLuint width, GLuint height)
+	void Renderer::initFrameBuffer(GLuint width, GLuint height, bool multisampling, GLuint samples)
 	{
+		// о б ы ч н ы й   ф р е й м - б у ф е р
+
 		// Сохранить размеры в структуре
 		this->frameBuffer_.sizes = { width,height };
+		// Кол-во семплов в обычном буфере равно единице (хоть этот параметр и не используется, установим)
+		this->frameBuffer_.samples = 1;
+
+		// Создать объект фрейм-буфера и привязать его (работаем с фрейм-буфером)
+		glGenFramebuffers(1, &(this->frameBuffer_.fboId));
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
 
 		// Создать объект текстуры для цветового вложения фрейм-буфера
 		glGenTextures(1, &(this->frameBuffer_.colorAttachmentId));
@@ -38,9 +48,6 @@ namespace ogl
 		// Отвязать render-буфер
 		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-		// Создать объект фрейм-буфера и привязать его (работаем с фрейм-буфером)
-		glGenFramebuffers(1, &(this->frameBuffer_.fboId));
-		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
 		// Привязать текстуру к кадровому буферу в качестве нулевого цветового вложения
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, frameBuffer_.colorAttachmentId, 0);
 		// Привязать render-буфер глубины-трафарета в качестве вложения глубины трафарета
@@ -49,6 +56,49 @@ namespace ogl
 		// Если фрейм-буфер не готов
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 			throw std::runtime_error("OpenGL:Renderer: Frame buffer can't be initialized");
+		}
+
+		// Прекращаем работу с фрейм-буфером
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// Если не нужен мульти-семплинг - выход из функции
+		if (!multisampling) return;
+
+		// ф р е й м - б у ф е р  с  у ч е т о м  M S A A
+
+		// Сохранить размеры в структуре
+		this->frameBufferMSAA_.sizes = { width,height };
+		// Кол-во семплов
+		this->frameBufferMSAA_.samples = samples;
+
+		// Создать объект фрейм-буфера и привязать его (работаем с фрейм-буфером)
+		glGenFramebuffers(1, &(this->frameBufferMSAA_.fboId));
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBufferMSAA_.fboId);
+
+		// Создать объект текстуры для цветового вложения фрейм-буфера
+		glGenTextures(1, &(this->frameBufferMSAA_.colorAttachmentId));
+		glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, this->frameBufferMSAA_.colorAttachmentId);
+		// Выделить текстурную память нужного размера
+		glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, this->frameBufferMSAA_.samples, GL_RGB, width, height, GL_TRUE);
+		// Отвязать текустуру (завершаем работу с текстурой)
+		glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+
+		// Создание буфера глубины-трафарета (используем render-буфер, не текстуру, т.к. выборка в шейдере не нужна)
+		glGenRenderbuffers(1, &(this->frameBufferMSAA_.depthStencilAttachmentId));
+		glBindRenderbuffer(GL_RENDERBUFFER, this->frameBufferMSAA_.depthStencilAttachmentId);
+		// Выделить необходимое кол-во памяти
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, this->frameBufferMSAA_.samples, GL_DEPTH24_STENCIL8, frameBufferMSAA_.sizes.x, frameBufferMSAA_.sizes.y);
+		// Отвязать render-буфер
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+		// Привязать текстуру к кадровому буферу в качестве нулевого цветового вложения
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, frameBufferMSAA_.colorAttachmentId, 0);
+		// Привязать render-буфер глубины-трафарета в качестве вложения глубины трафарета
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, frameBufferMSAA_.depthStencilAttachmentId);
+
+		// Если фрейм-буфер не готов
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			throw std::runtime_error("OpenGL:Renderer: Frame buffer(MSAA) can't be initialized");
 		}
 
 		// Прекращаем работу с фрейм-буфером
@@ -77,13 +127,16 @@ namespace ogl
 	* \param hwnd Хендл WinAPI окна
 	* \param shaderBasic Основной шейдер
 	* \param shaderPostProcessing Шейдер для пост-обработки
+	* \param msaa Активировать мульти-семплинг
+	* \param samples Кол-во семплов
 	*/
-	Renderer::Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing) :
+	Renderer::Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing, bool msaa, GLuint samples) :
 		hwnd_(hwnd),
 		viewMatrix_(glm::mat4(1)),
 		projectionMatrix_(glm::mat4(1)),
 		shaderBasic_(shaderBasic),
 		shaderPostProc_(shaderPostProcessing),
+		enableMSAA_(msaa),
 		cameraPosition(glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		// Получение размеров области вида
@@ -103,7 +156,10 @@ namespace ogl
 		}
 
 		// Инициализация фрейм-буфера для пост-процессинга
-		this->initFrameBuffer(this->viewPort.width, this->viewPort.height);
+		this->initFrameBuffer(this->viewPort.width, this->viewPort.height, this->enableMSAA_, samples);
+
+		// Активация/деактивация мульти-семплинга
+		if (enableMSAA_) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
 
 		// Установка размеров области вида
 		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
@@ -288,8 +344,15 @@ namespace ogl
 
 		// П Р О Х О Д - 1
 
-		// Активировать фрейм-буфер (рендеринг осуществляется в данный фрейм-буффер)
-		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
+		// Если мульти-семплинг включен - рендерить в MSAA фрейм-буфер
+		if(this->enableMSAA_){
+			glBindFramebuffer(GL_FRAMEBUFFER, this->frameBufferMSAA_.fboId);
+		}
+		// Если мульти-семплинг отключен - рандерить в основной фрейм-буфер
+		else{
+			glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.fboId);
+		}
+
 
 		// Установка параметров очистки экрана
 		glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
@@ -582,6 +645,13 @@ namespace ogl
 
 
 		// П Р О Х О Д - 2
+
+		// Если мультисемплинг включен, необходимо осуществить перенос из MSAA буфера в обычной (для дальнейшего пост-процессинга)
+		if(this->enableMSAA_){
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, this->frameBufferMSAA_.fboId);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->frameBuffer_.fboId);
+			glBlitFramebuffer(0, 0, this->frameBufferMSAA_.sizes.x, this->frameBufferMSAA_.sizes.y, 0, 0, this->frameBuffer_.sizes.x, this->frameBuffer_.sizes.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		}
 
 		// Активировать фрейм-буфер окна (рендеринг на поверхность окна)
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
