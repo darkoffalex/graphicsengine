@@ -41,7 +41,8 @@ namespace ogl
 		{
 			SOLID_COLORED,
 			FULL_BRIGHT_TEXTURED,
-			SKYBOX
+			SKYBOX,
+			LIGHT_SHADOW_MAP,
 		};
 
 		/**

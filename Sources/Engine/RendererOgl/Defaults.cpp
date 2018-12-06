@@ -231,6 +231,20 @@ namespace ogl
 				"uniform samplerCube skybox;\n"
 				"void main(){FragColor = texture(skybox, TexCoords);}\n"
 				"/*FRAGMENT-SHADER-END*/\n";
+		case ogl::defaults::DefaultShaderType::LIGHT_SHADOW_MAP:
+			return
+				"/*VERTEX-SHADER-BEGIN*/\n"
+				"#version 330 core\n"
+				"layout (location = 0) in vec3 position;\n"
+				"uniform mat4 model;\n"
+				"uniform mat4 view;\n"
+				"uniform mat4 projection;\n"
+				"void main(){gl_Position = projection * view * model * vec4(position, 1.0);}\n"
+				"/*VERTEX-SHADER-END*/\n"
+				"/*FRAGMENT-SHADER-BEGIN*/\n"
+				"#version 330 core\n"
+				"void main(){gl_FragDepth = gl_FragCoord.z;}\n"
+				"/*FRAGMENT-SHADER-END*/\n";
 		}
 	}
 }

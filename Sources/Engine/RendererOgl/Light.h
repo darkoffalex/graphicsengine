@@ -26,6 +26,7 @@ namespace ogl
 
 	public:
 		bool render;              // Отображать ли источник визуально
+		bool shadows;             // Создает тени от объектов (ВНИМАНИЕ! такой может быть только один)
 		float renderScale;        // Размер отображаемого объекта
 		glm::vec3 position;       // Положение в пространстве (важно для POINT_LIGHT и SPOT_LIGHT)
 		glm::vec3 rotation;       // Вращение (важно для DIRECTIONAL_LIGHT и для SPOT_LIGHT)
@@ -62,13 +63,24 @@ namespace ogl
 		 */
 		glm::mat4 getTranslationMatrix() const;
 
-
 		/**
 		 * \brief Получить матрицу модели
 		 * \param additionalScale Дополнительный множитель размера
 		 * \return Матрица
 		 */
 		glm::mat4 getModelMatrix(float additionalScale = 1.0f) const;
+
+		/**
+		 * \brief Получить матрицу вида для источника света
+		 * \return Матрица
+		 */
+		glm::mat4 getViewMatrix() const;
+
+		/**
+		 * \brief Получить матрицу проекции с точки зрения источника
+		 * \return Матрица
+		 */
+		glm::mat4 getProjectionMatrix(GLfloat zNear = 0.1f, GLfloat zFar = 7.0f) const;
 
 		/**
 		 * \brief Получить тип

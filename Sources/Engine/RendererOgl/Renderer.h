@@ -30,6 +30,7 @@ namespace ogl
 		ShaderResourcePtr shaderSkybox_;     // Шейдер для рендеринга скайбокса
 		ShaderResourcePtr shaderBasic_;      // Шейдер для основного освещения
 		ShaderResourcePtr shaderPostProc_;   // Шейдер для пост-обработки
+		ShaderResourcePtr shaderShadowMap_;  // Шейдер для рендеринга только карты глубины
 
 		bool enableMSAA_;                    // Включить MSAA
 
@@ -38,6 +39,14 @@ namespace ogl
 		// поэтому обычный (не MSAA) буфер нужно создать в любом случае (используется сглаживание или нет)
 		FrameBuffer frameBuffer_;            // Буфер кадра
 		FrameBuffer frameBufferMSAA_;        // Буфер кадра с учетом мульти-семплинга
+
+		// Буфер теней (карта глубины с точки зрения источника света)
+		// Используется для проверки - находится ли фрагмент в тени для источника или нет (больше ли его Z-значение)
+		struct{
+			GLuint fboID;
+			GLuint depthMapID;
+			glm::ivec2 sizes;
+		} shadowMapBuffer_;
 
 		/**
 		 * \brief Текстурные ресурсы по умолчанию
@@ -89,9 +98,27 @@ namespace ogl
 		void initFrameBuffer(GLuint width, GLuint height, bool multisampling = false, GLuint samples = 2);
 
 		/**
+		 * \brief Инициализация буфера теней (для источника отбрасывающего тени, лол)
+		 * \param width Ширина
+		 * \param height Высота
+		 */
+		void initShadowBuffer(GLuint width = 1024, GLuint height = 1024);
+
+		/**
 		 * \brief Де-инициализация кадрового буффера
 		 */
 		void freeFrameBuffer();
+
+		/**
+		 * \brief Де-инициализация буфера теней
+		 */
+		void freeShadowBuffer();
+
+		/**
+		 * \brief Получить первый лайт с активным рендерингом теней
+		 * \return Указатель на лайт
+		 */
+		LightPtr getFirstShadowLight();
 
 	public:
 		/**

@@ -24,6 +24,7 @@ out vec2 vsoTextCoordsSpecular; // Текстурные координаты (sp
 out vec2 vsoTextCoordsBump;     // Текстурные координаты (bump)
 out vec3 vsoNormal;             // Нормаль
 out vec3 vsoFragmentPosition;   // Положение вершины в мир. координатах (интерполируется для фрагментов)
+out vec4 vsoFragPosLightSpace;  // Положение вершин относительно источника света (проекция, до деления на w)
 out vec3 vsoLocalPosition;      // Положение вершины (исходное, без трансформаций)
 out mat3 vsoNormalMatrix;       // Матрица преобразования нормалей (учет поворота и масштабирования)
 
@@ -31,6 +32,7 @@ out mat3 vsoNormalMatrix;       // Матрица преобразования �
 uniform mat4 model;                    // Матрица модели (трансформация объекта)
 uniform mat4 view;                     // Матрица вида (переход в координатную систему камеры)
 uniform mat4 projection;               // Матрица проекции (проекция на экран)
+uniform mat4 lightSpaceMatrix;         // Матрица прострастранства источника света (с учетом проекции)
 
 uniform TexMapping texMappingDiffuse;  // Маппинг текстуры (diffuse)
 uniform TexMapping texMappingDetail;   // Маппинг текстуры (detail)
@@ -62,6 +64,9 @@ void main()
 	// Положение подвергается преобразованию (нужны глобальные координаты)
 	vsoFragmentPosition = vec3(model * vec4(position, 1.0f));
 
+	// Вершина в проекции для источника света отбрасывающего тени
+	vsoFragPosLightSpace = lightSpaceMatrix * model * vec4(position, 1.0f);
+
 	// Исходное положение вершины
 	vsoLocalPosition = position;
 }
@@ -85,6 +90,7 @@ in vec2 vsoTextCoordsSpecular[]; // Текстурные координаты (s
 in vec2 vsoTextCoordsBump[];     // Текстурные координаты (bump)
 in vec3 vsoNormal[];             // Нормаль от данного фрагмента
 in vec3 vsoFragmentPosition[];   // Положение вершины в мир. координатах (интерполируется для фрагментов)
+in vec4 vsoFragPosLightSpace[];  // Положение вершин относительно источника света (проекция, до деления на w)
 in vec3 vsoLocalPosition[];      // Положение вершины (исходное, без трансформаций)
 in mat3 vsoNormalMatrix[];       // Матрица преобразования нормалей (учет поворота и масштабирования)
 
@@ -97,6 +103,7 @@ out vec2 gsoTextCoordsSpecular; // Текстурные координаты (sp
 out vec2 gsoTextCoordsBump;     // Текстурные координаты (bump)
 out vec3 gsoNormal;             // Нормаль
 out vec3 gsoFragmentPosition;   // Положение фрагмента
+out vec4 gsoFragPosLightSpace;  // Положение фрагмента спроецированного для источника света
 out mat3 gsoTBN;                // Матрица для преобразования из касательного пространства в мировое
 
 // Uniform-переменные
@@ -126,6 +133,7 @@ void main()
 		gsoTextCoordsBump = vsoTextCoordsBump[i];
 		gsoNormal = vsoNormal[i];
 		gsoFragmentPosition = vsoFragmentPosition[i];
+		gsoFragPosLightSpace = vsoFragPosLightSpace[i];
 
 		// Собрать TBN матрицу (касательного-мирового пространства)
 		vec3 T = OrthogonalizeTangent(vsoNormalMatrix[i] * polygonTangent, vsoNormal[i]);
@@ -186,7 +194,8 @@ in vec2 gsoTextCoordsSpecular; // Текстурные координаты (spe
 in vec2 gsoTextCoordsBump;     // Текстурные координаты (bump)
 in vec3 gsoNormal;             // Нормаль от данного фрагмента
 in vec3 gsoFragmentPosition;   // Положение данного фрагмента (абсолютное)
-in mat3 gsoTBN;                 // Матрица для преобразования из касательного пространства в мировое
+in vec4 gsoFragPosLightSpace;  // Положение фрагмента спроецированного для источника света
+in mat3 gsoTBN;                // Матрица для преобразования из касательного пространства в мировое
 
 // Описание материала
 struct Material
@@ -240,11 +249,15 @@ uniform sampler2D detailTexture;                     // Деатльная те�
 uniform sampler2D specularTexture;                   // Бликовая текстура
 uniform sampler2D bumpTexture;                       // Бамп текстура (карта нормалей)
 uniform sampler2D flashlightTexture;                 // Текстура пятен фонарика
+uniform sampler2D shadowMapTexture;                  // Текстура для просчета теней
 
 // Функции подсчета цветов для каждого типа источника
 vec3 CalcPointLightComponents(PointLight light, vec3 normal, vec3 viewDir);
 vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir);
 vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir);
+
+// Функция определения находится ли фрагмент в тени
+float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir);
 
 // Результрующий цвет фрагмента
 out vec4 color;
@@ -292,6 +305,55 @@ void main()
 	color = vec4(gsoColor * result, alpha);
 }
 
+// Находится ли фрагмент в тени
+float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
+{
+	// Окончательная проекция фрагмента на плоскость "видимую" источником освещения
+	// Z-компонента содержит глубину (использующуюся в Z-буфере)
+	vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+	// Если с точки зрения источника фрагмент находится за дальней гранью отсечения
+	// можно считать что он не в тени
+	if(projCoords.z > 1.0f){
+		return 0.0f;
+	}
+
+	// Привести к диапозону [0,1]
+    projCoords = projCoords * 0.5 + 0.5;
+
+	// Первое пересечение "луча света" с фрагментом (значение глубины)
+	//float closestDepth = texture(shadowMapTexture, projCoords.xy).r;
+
+	// Теневое смещение
+	// Поскольку размер текстуры теней ограничен, свет под углом будет создаваь артефакты там
+	// где глубина из карты теней и реальная глубина должны совпадать (появяться темные линии)
+	// Чтобы этого избежать - значение глубины корректируется (с учетом угла падения света)
+	float bias = max(0.0005 * (1.0 - dot(normal, lightDir)), 0.001);
+
+	// Интенсивность тени
+	float shadow = 0;
+
+	// PCF фильтрация тени
+	// Берется значение соседних текселей и усредняется (в данном случае 9 соседних текселей)
+	vec2 texelSize = 1.0 / textureSize(shadowMapTexture, 0);
+	for(int x = -1; x <= 1; ++x)
+	{
+		for(int y = -1; y <= 1; ++y)
+		{
+			// Первое пересечение "луча света" с фрагментом (значение глубины)
+			float pcfDepth = texture(shadowMapTexture, projCoords.xy + vec2(x, y) * texelSize).r;
+
+			// Если с точки зрения источника фрагмент глубже чем положение первого
+			// пересечения с лучем света (из текстуры) - считать что фрагмент в тени
+			shadow += projCoords.z - bias > pcfDepth ? 1.0 : 0.0;
+		}
+	}
+	// Для усреднения - делим на кол-во соседних текселей
+	// значения которых суммировались
+	shadow /= 9.0;
+
+	return shadow;
+}
 
 // Подсчет освещенности фрагмента точечным источником
 vec3 CalcPointLightComponents(PointLight light, vec3 normal, vec3 viewDir)
@@ -332,7 +394,10 @@ vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir
 	float specularBrightness = pow(max(dot(viewDir, reflectedLightDir), 0.0), material.shininess);
 	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,gsoTextCoordsSpecular));
 
-	return (ambient + diffuse + specular);
+	// Находится ли фрагмент в тени (1.0f - да, 0.0f - нет)
+	float shadow = CalcShadowIntensity(gsoFragPosLightSpace, normal, -lightDir);
+
+	return (ambient + (diffuse + specular) * (1.0f - shadow));
 }
 
 // Подсчет освещенности фрагмента светом прожектора/фонарика
@@ -373,6 +438,9 @@ vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir)
 	float distance = length(light.position - gsoFragmentPosition);
 	float attenuation = 1.0f / (1.0f + light.linear * distance + light.quadratic * (distance * distance));
 
-	return ((diffuse * attenuation * intensity * texIntensity) + (specular * attenuation * intensity * texIntensity ));
+	// Находится ли фрагмент в тени (1.0f - да, 0.0f - нет)
+	float shadow = CalcShadowIntensity(gsoFragPosLightSpace, normal, -light.direction);
+
+	return ((diffuse * attenuation * intensity * texIntensity) + (specular * attenuation * intensity * texIntensity )) * (1.0f - shadow);
 }
 /*FRAGMENT-SHADER-END*/

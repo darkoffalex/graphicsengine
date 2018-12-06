@@ -323,23 +323,25 @@ void Init(ogl::Renderer* pRenderer)
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
 
-	// Добавить к отрисовке куб
-	ogl::StaticMeshPtr cube = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
-	cube->position = { 0.0f,-0.75f,-1.0f };
-	cube->scale = { 0.5f,0.5f,0.5f };
+	// Добавить к отрисовке кубы
+	ogl::StaticMeshPtr cube1 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube1->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
+	cube1->position = { 0.0f,-0.75f,-1.0f };
+	cube1->scale = { 0.5f,0.5f,0.5f };
 
-	// Добавить к отрисовке траву
-	ogl::StaticMeshPtr grassSprite = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.wall)));
-	grassSprite->getParts()[0].diffuseTexture.resource = _sceneResources.textures.grassDiffuse;
-	grassSprite->getParts()[0].diffuseTexture.wrapS = GL_CLAMP_TO_EDGE;
-	grassSprite->getParts()[0].diffuseTexture.wrapT = GL_CLAMP_TO_EDGE;
-	grassSprite->position = { 1.0f,-0.75f,-0.5f };
-	grassSprite->scale = { 0.05f,0.05f,0.05f };
+	ogl::StaticMeshPtr cube2 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube2->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
+	cube2->position = { -1.0f,-0.88f,-1.0f };
+	cube2->scale = { 0.25f,0.25f,0.25f };
+
+	ogl::StaticMeshPtr cube3 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube3->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
+	cube3->position = { 1.0f,-0.88f,-1.0f };
+	cube3->scale = { 0.25f,0.25f,0.25f };
 
 	// Добавить источник света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -90.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
-	centralLight->render = true;
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	centralLight->shadows = true;
 
 	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
@@ -351,7 +353,11 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
-	_pRenderer->getLights()[0]->rotation.x += 0.1f * frameDeltaMs;
+	static float speed = 0.001f;
+	if (_pRenderer->getLights()[0]->position.x > 1.5f || _pRenderer->getLights()[0]->position.x < -1.5f) speed *= -1;
+	_pRenderer->getLights()[0]->position.x += speed;
+	
+	//_pRenderer->getLights()[0]->rotation.x += 0.05f * frameDeltaMs;
 
 	// Если есть камера
 	if(_pCamera != nullptr)

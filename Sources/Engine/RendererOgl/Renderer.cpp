@@ -106,6 +106,51 @@ namespace ogl
 	}
 
 	/**
+	* \brief Инициализация буфера теней (для источника отбрасывающего тени, лол)
+	* \param width Ширина
+	* \param height Высота
+	*/
+	void Renderer::initShadowBuffer(GLuint width, GLuint height)
+	{
+		// Генерация фрейм-буфера
+		this->shadowMapBuffer_.sizes = { width,height };
+		glGenFramebuffers(1, &(this->shadowMapBuffer_.fboID));
+
+		// Генерация и настройка текстуры карты теней
+		glGenTextures(1, &(this->shadowMapBuffer_.depthMapID));
+		glBindTexture(GL_TEXTURE_2D, this->shadowMapBuffer_.depthMapID);
+		// Поскольку она используется только рендеринга Z-буфера, используем GL_DEPTH_COMPONENT
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		// Не используем фильтрацию
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// При выходе за пределы UV карты - отдавать цвет рамок
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		// Установит белый цвет рамок
+		float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+		// Отвязать текустуру (завершаем работу с текстурой)
+		glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+
+		// Работа с фрейм-буфером
+		glBindFramebuffer(GL_FRAMEBUFFER, this->shadowMapBuffer_.fboID);
+		// В качестве вложения глубины используем текстуру с компонентой глубины
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, this->shadowMapBuffer_.depthMapID, 0);
+		// В качестве вложения цвета ничего не используем (это указывается таким образом)
+		glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);
+		
+		// Если фрейм-буфер не готов
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			throw std::runtime_error("OpenGL:Renderer: Frame buffer(MSAA) can't be initialized");
+		}
+
+		// Завершаем работу с фрейм-буфером
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	/**
 	 * \brief Де-инициализация кадрового буффера
 	 */
 	void Renderer::freeFrameBuffer()
@@ -120,6 +165,50 @@ namespace ogl
 		this->frameBuffer_.depthStencilAttachmentId = 0;
 		this->frameBuffer_.colorAttachmentId = 0;
 		this->frameBuffer_.sizes = {};
+
+		// Если сглаживание включено
+		if(this->enableMSAA_)
+		{
+			// Удалить все объекты буферов
+			glDeleteFramebuffers(1, &(this->frameBufferMSAA_.fboId));
+			glDeleteRenderbuffers(1, &(this->frameBufferMSAA_.depthStencilAttachmentId));
+			glDeleteTextures(1, &(this->frameBufferMSAA_.colorAttachmentId));
+
+			// Обнулить идентификаторы и прочие значения
+			this->frameBufferMSAA_.fboId = 0;
+			this->frameBufferMSAA_.depthStencilAttachmentId = 0;
+			this->frameBufferMSAA_.colorAttachmentId = 0;
+			this->frameBufferMSAA_.sizes = {};
+		}
+	}
+
+	/**
+	* \brief Де-инициализация буфера теней
+	*/
+	void Renderer::freeShadowBuffer()
+	{
+		// Удалить все объекты буферов
+		glDeleteFramebuffers(1, &(this->shadowMapBuffer_.fboID));
+		glDeleteTextures(1, &(this->shadowMapBuffer_.depthMapID));
+
+		// Обнулить идентификаторы
+		this->shadowMapBuffer_.fboID = 0;
+		this->shadowMapBuffer_.depthMapID = 0;
+		this->shadowMapBuffer_.sizes = {};
+	}
+
+	/**
+	* \brief Получить первый лайт с активным рендерингом теней
+	* \return Указатель на лайт
+	*/
+	LightPtr Renderer::getFirstShadowLight()
+	{
+		for(auto light : this->lights_)
+		{
+			if (light->shadows) return light;
+		}
+
+		return nullptr;
 	}
 
 	/**
@@ -157,6 +246,9 @@ namespace ogl
 
 		// Инициализация фрейм-буфера для пост-процессинга
 		this->initFrameBuffer(this->viewPort.width, this->viewPort.height, this->enableMSAA_, samples);
+
+		// Инициализация фрейм-буфера для карты теней
+		this->initShadowBuffer(1024, 1024);
 
 		// Активация/деактивация мульти-семплинга
 		if (enableMSAA_) glEnable(GL_MULTISAMPLE); else glDisable(GL_MULTISAMPLE);
@@ -219,6 +311,8 @@ namespace ogl
 		this->shaderSolidColor_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SOLID_COLORED));
 		// Шейдер по умолчанию для скайбокса
 		this->shaderSkybox_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SKYBOX));
+		// Шейдер для рендеринга карты глубины
+		this->shaderShadowMap_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::LIGHT_SHADOW_MAP));
 	}
 
 	/**
@@ -227,6 +321,7 @@ namespace ogl
 	Renderer::~Renderer()
 	{
 		this->freeFrameBuffer();
+		this->freeShadowBuffer();
 	}
 
 	/**
@@ -342,7 +437,73 @@ namespace ogl
 			throw std::runtime_error("OpenGL:Renderer: Glew is not initialised");
 		}
 
+		// Идентификаторы основных шейдеров
+		GLuint solidColorShaderID = this->shaderSolidColor_->getId();
+		GLuint basicShaderID = this->shaderBasic_->getId();
+		GLuint postProcShaderID = this->shaderPostProc_->getId();
+		GLuint skyboxShaderID = this->shaderSkybox_->getId();
+		GLuint shadowMapShaderID = this->shaderShadowMap_->getId();
+
+		// Получить первый источник света, которые создает тени
+		LightPtr shadowCastingLight = this->getFirstShadowLight();
+
+		// П Р О Х О Д - 0
+
+		if(shadowCastingLight != nullptr)
+		{
+			// Использовать упрощенный шейдер (рендеринг только глубины)
+			glUseProgram(shadowMapShaderID);
+
+			// Передача матриц проекции и вида в шейдер
+			glm::mat4 view = shadowCastingLight->getViewMatrix();
+			glm::mat4 projection = shadowCastingLight->getProjectionMatrix();
+			glUniformMatrix4fv(glGetUniformLocation(shadowMapShaderID, "view"), 1, GL_FALSE, glm::value_ptr(view));
+			glUniformMatrix4fv(glGetUniformLocation(shadowMapShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+			// Размер вьюпорта должен соответствовать размеру текстуры
+			glViewport(0, 0, this->shadowMapBuffer_.sizes.x, this->shadowMapBuffer_.sizes.y);
+
+			// Привязать буфер (рендеринг в данный буффер)
+			glBindFramebuffer(GL_FRAMEBUFFER, this->shadowMapBuffer_.fboID);
+			// Очистка компоненты глубины
+			glClear(GL_DEPTH_BUFFER_BIT);
+			// Включить тест глубины
+			glEnable(GL_DEPTH_TEST);
+
+			// Пройтись по всем статическим мешам
+			for (auto staticMesh : this->staticMeshes_)
+			{
+				// Пройтись по всем частям меша
+				for (auto part : staticMesh->getParts())
+				{
+					// Пеередать матрицу мрдели в шейдер
+					glm::mat4 mdodelMatrix = staticMesh->getModelMatrix();
+					glUniformMatrix4fv(glGetUniformLocation(shadowMapShaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
+
+					// Привязать VAO
+					glBindVertexArray(part.getGeometry()->getVaoId());
+
+					// Рисовать либо индексированную либо не-индексированную геометрию
+					if (part.getGeometry()->IsIndexed()) {
+						glDrawElements(GL_TRIANGLES, part.getGeometry()->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+					}
+					else {
+						glDrawArrays(GL_TRIANGLES, 0, part.getGeometry()->getVertexCount());
+					}
+
+					// Отвязка VAO
+					glBindVertexArray(0);
+				}
+			}
+
+			// Отвязать буфер (переключение на основой - окнный)
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+
 		// П Р О Х О Д - 1
+
+		// Установка размеров области вида
+		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
 
 		// Если мульти-семплинг включен - рендерить в MSAA фрейм-буфер
 		if(this->enableMSAA_){
@@ -360,12 +521,6 @@ namespace ogl
 
 		// Включить тест глубины
 		glEnable(GL_DEPTH_TEST);
-
-		// Идентификаторы основных шейдеров
-		GLuint solidColorShaderID = this->shaderSolidColor_->getId();
-		GLuint basicShaderID = this->shaderBasic_->getId();
-		GLuint postProcShaderID = this->shaderPostProc_->getId();
-		GLuint skyboxShaderID = this->shaderSkybox_->getId();
 
 		// с к а й - б о к с
 		if(this->backgroundTexture != nullptr)
@@ -537,6 +692,13 @@ namespace ogl
 		glUniformMatrix4fv(glGetUniformLocation(basicShaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
 		glUniformMatrix4fv(glGetUniformLocation(basicShaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
 
+		// Если есть лайт отбрасывающий тени
+		if (shadowCastingLight) {
+			// Передача матрицы вида-проекции источника света в шейдер
+			glm::mat4 lightSpaceMatrix = shadowCastingLight->getProjectionMatrix() * shadowCastingLight->getViewMatrix();
+			glUniformMatrix4fv(glGetUniformLocation(basicShaderID, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+		}
+
 		// Передать положение камеры (для бликов/отражений)
 		glUniform3fv(glGetUniformLocation(basicShaderID, "eyePosition"), 1, glm::value_ptr(this->cameraPosition));
 
@@ -618,6 +780,11 @@ namespace ogl
 				glActiveTexture(GL_TEXTURE4);
 				glBindTexture(GL_TEXTURE_2D, flashLightTextureId);
 				glUniform1i(glGetUniformLocation(basicShaderID, "flashlightTexture"), 4);
+
+				// ShadowMap
+				glActiveTexture(GL_TEXTURE5);
+				glBindTexture(GL_TEXTURE_2D, this->shadowMapBuffer_.depthMapID);
+				glUniform1i(glGetUniformLocation(basicShaderID, "shadowMapTexture"), 5);
 
 
 				// Передать параметры материала
