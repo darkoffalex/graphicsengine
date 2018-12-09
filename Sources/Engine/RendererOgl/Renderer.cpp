@@ -122,8 +122,8 @@ namespace ogl
 		// Поскольку она используется только рендеринга Z-буфера, используем GL_DEPTH_COMPONENT
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 		// Не используем фильтрацию
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		// При выходе за пределы UV карты - отдавать цвет рамок
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -642,7 +642,8 @@ namespace ogl
 				glUniform1f(glGetUniformLocation(basicShaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
 				// Передать квадратичный коэффициент затухания
 				glUniform1f(glGetUniformLocation(basicShaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
-
+				// Передать значение "использовать тени"
+				glUniform1i(glGetUniformLocation(basicShaderID, std::string(varBaseName + "enableShadows").c_str()), light->shadows);
 				// Увеличить итератор
 				pointLigths++;
 			}
@@ -656,7 +657,8 @@ namespace ogl
 				glUniform3fv(glGetUniformLocation(basicShaderID, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
 				// Передать цвет источника
 				glUniform3fv(glGetUniformLocation(basicShaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-
+				// Передать значение "использовать тени"
+				glUniform1i(glGetUniformLocation(basicShaderID, std::string(varBaseName + "enableShadows").c_str()), light->shadows);
 				// Увеличить итератор
 				directionalLights++;
 			}
@@ -680,6 +682,8 @@ namespace ogl
 				glUniform1f(glGetUniformLocation(basicShaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
 				// Передать квадратичный коэффициент затухания
 				glUniform1f(glGetUniformLocation(basicShaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
+				// Передать значение "использовать тени"
+				glUniform1i(glGetUniformLocation(basicShaderID, std::string(varBaseName + "enableShadows").c_str()), light->shadows);
 				// Матрица модели
 				glm::mat4 mdodelMatrix = light->getModelMatrix();
 				glUniformMatrix4fv(glGetUniformLocation(basicShaderID, std::string(varBaseName + "modelMatrix").c_str()), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));

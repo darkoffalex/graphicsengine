@@ -213,6 +213,7 @@ struct PointLight
 	vec3 color;
 	float linear;
 	float quadratic;
+	bool enableShadows;
 };
 
 // Направленный источник освещения
@@ -220,6 +221,7 @@ struct DirectLight
 {
 	vec3 direction;
 	vec3 color;
+	bool enableShadows;
 };
 
 // Прожектор (фонарик)
@@ -233,6 +235,7 @@ struct SpotLight
 	float cutOffCos;
 	float cutOffOuterCos;
 	mat4 modelMatrix;
+	bool enableShadows;
 };
 
 // Uniform-переменные
@@ -257,7 +260,7 @@ vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir
 vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir);
 
 // Функция определения находится ли фрагмент в тени
-float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir);
+float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, float minBias);
 
 // Результрующий цвет фрагмента
 out vec4 color;
@@ -306,7 +309,7 @@ void main()
 }
 
 // Находится ли фрагмент в тени
-float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
+float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir, float minBias)
 {
 	// Окончательная проекция фрагмента на плоскость "видимую" источником освещения
 	// Z-компонента содержит глубину (использующуюся в Z-буфере)
@@ -328,7 +331,7 @@ float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 	// Поскольку размер текстуры теней ограничен, свет под углом будет создаваь артефакты там
 	// где глубина из карты теней и реальная глубина должны совпадать (появяться темные линии)
 	// Чтобы этого избежать - значение глубины корректируется (с учетом угла падения света)
-	float bias = max(0.0005 * (1.0 - dot(normal, lightDir)), 0.001);
+	float bias = max(0.0005 * (1.0 - dot(normal, lightDir)), minBias);
 
 	// Интенсивность тени
 	float shadow = 0;
@@ -340,7 +343,7 @@ float CalcShadowIntensity(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 	{
 		for(int y = -1; y <= 1; ++y)
 		{
-			// Первое пересечение "луча света" с фрагментом (значение глубины)
+			// Первое пересечение "луча света" с фрагментом (значение глубины из карты теней) с учетом сдвига текселей
 			float pcfDepth = texture(shadowMapTexture, projCoords.xy + vec2(x, y) * texelSize).r;
 
 			// Если с точки зрения источника фрагмент глубже чем положение первого
@@ -394,8 +397,8 @@ vec3 CalcDirectionalLightComponents(DirectLight light, vec3 normal, vec3 viewDir
 	float specularBrightness = pow(max(dot(viewDir, reflectedLightDir), 0.0), material.shininess);
 	vec3 specular = light.color * (specularBrightness * material.specularColor) * vec3(texture(specularTexture,gsoTextCoordsSpecular));
 
-	// Находится ли фрагмент в тени (1.0f - да, 0.0f - нет)
-	float shadow = CalcShadowIntensity(gsoFragPosLightSpace, normal, -lightDir);
+	// Интенсивности тени (1 - фрагмент в тени, 0 - не в тени)
+	float shadow = light.enableShadows ? CalcShadowIntensity(gsoFragPosLightSpace, normal, -lightDir, 0.006f) : 0.0f;
 
 	return (ambient + (diffuse + specular) * (1.0f - shadow));
 }
@@ -438,8 +441,8 @@ vec3 CalcSpotLightComponents(SpotLight light, vec3 normal, vec3 viewDir)
 	float distance = length(light.position - gsoFragmentPosition);
 	float attenuation = 1.0f / (1.0f + light.linear * distance + light.quadratic * (distance * distance));
 
-	// Находится ли фрагмент в тени (1.0f - да, 0.0f - нет)
-	float shadow = CalcShadowIntensity(gsoFragPosLightSpace, normal, -light.direction);
+	// Интенсивности тени (1 - фрагмент в тени, 0 - не в тени)
+	float shadow = light.enableShadows ? CalcShadowIntensity(gsoFragPosLightSpace, normal, lightDir, 0.001f) : 0.0f;
 
 	return ((diffuse * attenuation * intensity * texIntensity) + (specular * attenuation * intensity * texIntensity )) * (1.0f - shadow);
 }
