@@ -29,7 +29,8 @@ ogl::Renderer * _pRenderer;
 struct{
 	// Шейдеры
 	struct {
-		ogl::ShaderResourcePtr basicShader;
+		ogl::ShaderResourcePtr geometry;
+		ogl::ShaderResourcePtr lighting;
 		ogl::ShaderResourcePtr postProcessing;
 	} shaders;
 
@@ -44,12 +45,6 @@ struct{
 		ogl::TextureResourcePtr wallDiffuse;
 		ogl::TextureResourcePtr wallSpecular;
 		ogl::TextureResourcePtr wallBump;
-
-		ogl::TextureResourcePtr grassDiffuse;
-
-		ogl::TextureResourcePtr flashLight;
-
-		ogl::TextureCubicResourcePtr background;
 	} textures;
 
 	// Геометрия
@@ -78,7 +73,6 @@ void Init(ogl::Renderer * pRenderer);
  * \param frameDeltaMs Время кадра
  */
 void Update(float frameDeltaMs);
-
 
 
 /**
@@ -145,7 +139,12 @@ int main(int argc, char* argv[])
 		Load();
 
 		// Создать рендерер
-		_pRenderer = new ogl::Renderer(hWnd, _sceneResources.shaders.basicShader, _sceneResources.shaders.postProcessing, true, 4);
+		_pRenderer = new ogl::Renderer(
+			hWnd, 
+			_sceneResources.shaders.geometry, 
+			_sceneResources.shaders.lighting, 
+			_sceneResources.shaders.postProcessing
+		);
 
 		// Создать камеру
 		_pCamera = new CameraControllable(1.5f, 0.3f, _pRenderer->viewPort.getAspectRatio());
@@ -183,16 +182,14 @@ int main(int argc, char* argv[])
 			float deltaMs = static_cast<float>(delta) / 1000;
 
 			// Подсчет FPS
-			/*
-			std::string deltaStr = std::string("Graphics (").append(std::to_string((1/deltaMs)*1000)).append(" FPS)");
-			SetWindowTextA(hWnd, deltaStr.c_str());
-			*/
+			//std::string deltaStr = std::string("Graphics (").append(std::to_string((1/deltaMs)*1000)).append(" FPS)");
+			//SetWindowTextA(hWnd, deltaStr.c_str());
+			
 
 			// Обновление
 			Update(deltaMs);
 
 			// Нарисовать кадр
-			//_pRenderer->drawFrame(glm::vec4(0.2f, 0.4f, 0.6f, 1.0f));
 			_pRenderer->drawFrame(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
 			// Обновить время последнего кадра
@@ -217,13 +214,15 @@ void Load()
 {
 	// Ш Е Й Д Е Р Ы
 
-	// Загрузить основной шейдер
-	std::string shaderSource = LoadStringFromFile(ShadersDir().append("basic.glsl"));
-	_sceneResources.shaders.basicShader = ogl::MakeShaderResource(shaderSource);
+	// Загрузить код шейдеров
+	std::string geometryShaderSource = LoadStringFromFile(ShadersDir().append("geometry.glsl"));
+	std::string lightingShaderSource = LoadStringFromFile(ShadersDir().append("lighting.glsl"));
+	std::string postProcessingShaderSource = LoadStringFromFile(ShadersDir().append("post.glsl"));
 
-	// Загрузить шейдер для пост-процессинга
-	shaderSource = LoadStringFromFile(ShadersDir().append("post-processing.glsl"));
-	_sceneResources.shaders.postProcessing = ogl::MakeShaderResource(shaderSource);
+	// Создать шейдерные программы
+	_sceneResources.shaders.geometry = ogl::MakeShaderResource(geometryShaderSource);
+	_sceneResources.shaders.lighting = ogl::MakeShaderResource(lightingShaderSource);
+	_sceneResources.shaders.postProcessing = ogl::MakeShaderResource(postProcessingShaderSource);
 
 	// Г Е О М Е Т Р И Я
 
@@ -268,33 +267,6 @@ void Load()
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall_normal.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
-
-	// Текстура травы
-	stbi_set_flip_vertically_on_load(true);
-	textureBytes = stbi_load(ExeDir().append("..\\Textures\\grass.png").c_str(), &width, &height, &bpp, 4);
-	_sceneResources.textures.grassDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), false);
-	stbi_image_free(textureBytes);
-
-	// Текстура фонарика
-	stbi_set_flip_vertically_on_load(true);
-	textureBytes = stbi_load(ExeDir().append("..\\Textures\\flashlight.jpg").c_str(), &width, &height, &bpp, 3);
-	_sceneResources.textures.flashLight = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), false);
-	stbi_image_free(textureBytes);
-
-
-	// Текстура фона (кубическая карта скай-бокса)
-	stbi_set_flip_vertically_on_load(false);
-	std::vector<ogl::TextureCubicInitFace> faces(6);
-	faces[0].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posx.jpg").c_str(), &(faces[0].width), &(faces[0].height), &(faces[0].bpp), 3); // Право
-	faces[1].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negx.jpg").c_str(), &(faces[1].width), &(faces[1].height), &(faces[1].bpp), 3); // Лево
-	faces[2].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posy.jpg").c_str(), &(faces[2].width), &(faces[2].height), &(faces[2].bpp), 3); // Верх
-	faces[3].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negy.jpg").c_str(), &(faces[3].width), &(faces[3].height), &(faces[3].bpp), 3); // Низ
-	faces[4].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\posz.jpg").c_str(), &(faces[4].width), &(faces[4].height), &(faces[4].bpp), 3); // Перед
-	faces[5].textureData = stbi_load(ExeDir().append("..\\Textures\\background\\negz.jpg").c_str(), &(faces[5].width), &(faces[5].height), &(faces[5].bpp), 3); // Зад
-	_sceneResources.textures.background = ogl::MakeTextureCubicResource(faces, false);
-	for(int i = 0; i < 6; i++){
-		stbi_image_free(faces[i].textureData);
-	}
 }
 
 /**
@@ -303,11 +275,6 @@ void Load()
 */
 void Init(ogl::Renderer* pRenderer)
 {
-	// Добавить текстуру фонарика
-	_pRenderer->flashLightTexture = _sceneResources.textures.flashLight;
-	// Добавить текстуру фона (скайбокс)
-	_pRenderer->backgroundTexture = _sceneResources.textures.background;
-
 	// Добавить к отрисовке пол, настроить его текстуру и положение
 	ogl::StaticMeshPtr groundMesh = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.ground)));
 	groundMesh->getParts()[0].diffuseTexture.resource = _sceneResources.textures.groundDiffuse;
@@ -323,28 +290,16 @@ void Init(ogl::Renderer* pRenderer)
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
 
-	// Добавить к отрисовке кубы
-	ogl::StaticMeshPtr cube1 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube1->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
-	cube1->position = { 0.0f,-0.75f,-1.0f };
-	cube1->scale = { 0.5f,0.5f,0.5f };
+	// Добавить к отрисовке куб
+	ogl::StaticMeshPtr cube = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
+	cube->position = { 0.0f,-0.75f,-1.0f };
+	cube->scale = { 0.5f,0.5f,0.5f };
 
-	ogl::StaticMeshPtr cube2 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube2->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
-	cube2->position = { -1.0f,-0.88f,-1.0f };
-	cube2->scale = { 0.25f,0.25f,0.25f };
-
-	ogl::StaticMeshPtr cube3 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube3->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
-	cube3->position = { 1.0f,-0.88f,-1.0f };
-	cube3->scale = { 0.25f,0.25f,0.25f };
-
-	// Добавить источник света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
-	centralLight->shadows = true;
-
-	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
-	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	// Добавить источники света, настроить его положение
+	//ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	//ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	//ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 }
 
 /**
@@ -353,12 +308,6 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
-	static float speed = 0.001f;
-	if (_pRenderer->getLights()[0]->position.x > 1.5f || _pRenderer->getLights()[0]->position.x < -1.5f) speed *= -1;
-	_pRenderer->getLights()[0]->position.x += speed;
-	
-	//_pRenderer->getLights()[0]->rotation.x += 0.05f * frameDeltaMs;
-
 	// Если есть камера
 	if(_pCamera != nullptr)
 	{

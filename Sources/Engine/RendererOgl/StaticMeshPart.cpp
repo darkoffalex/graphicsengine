@@ -10,7 +10,7 @@ namespace ogl
 	* \param leftHanded Левостороняя система
 	* \return Матрица поворота
 	*/
-	glm::mat4 TextureParameters::getRotMatrix(bool leftHanded) const
+	glm::mat2 TextureParameters::getRotMatrix(bool leftHanded) const
 	{
 		glm::mat2 rot;
 		rot[0][0] = glm::cos(glm::radians(this->rotation));

@@ -9,7 +9,6 @@
 
 #include "ShaderResource.h"
 #include "TextureResource.h"
-#include "TextureCubicResource.h"
 #include "StaticMesh.h"
 #include "Light.h"
 
@@ -26,55 +25,81 @@ namespace ogl
 		glm::mat4 viewMatrix_;               // Матрица вида
 		glm::mat4 projectionMatrix_;         // Матрица проекции
 
-		ShaderResourcePtr shaderSolidColor_; // Шейдер для однотонных объектов
-		ShaderResourcePtr shaderSkybox_;     // Шейдер для рендеринга скайбокса
-		ShaderResourcePtr shaderBasic_;      // Шейдер для основного освещения
-		ShaderResourcePtr shaderPostProc_;   // Шейдер для пост-обработки
-		ShaderResourcePtr shaderShadowMap_;  // Шейдер для рендеринга только карты глубины
+		// U B O
 
-		bool enableMSAA_;                    // Включить MSAA
+		GLuint uboViewProjection_;           // UBO для матриц вида-проекции
+		GLuint uboModel_;                    // UBO для матрицы модели
+		GLuint uboTextureMapping_;           // UBO для коэффициентов маппинга текстур
+		GLuint uboMaterialSettings_;         // UBO для параметров материала
+		GLuint uboPositions_;                // UBO для положения камеры (и каких-либо иных объектов)
 
-		// При постпроцессинге нельзя будет использовать картинку из MSAA буфера, поэтому
-		// ее нужно будет "ужать" до размеров обычного буфера и передать в обычный буфер,
-		// поэтому обычный (не MSAA) буфер нужно создать в любом случае (используется сглаживание или нет)
-		FrameBuffer frameBuffer_;            // Буфер кадра
-		FrameBuffer frameBufferMSAA_;        // Буфер кадра с учетом мульти-семплинга
+		// Б У Ф Е Р Ы  К А Д Р А
 
-		// Буфер теней (карта глубины с точки зрения источника света)
-		// Используется для проверки - находится ли фрагмент в тени для источника или нет (больше ли его Z-значение)
+		/**
+		 * \brief Идентификатор G-буфера и его вложений
+		 * \details В первом проходе рендеринг сцены будет осуществляться в G-буфер, без освещения
+		 */
+		struct {
+			GLuint gBufferId;                // ID буфера
+			GLuint gPositionAttachmentId;    // Позиции фрагментов в 3D пространстве
+			GLuint gNormalAttachmentId;      // Нормали фрагментов
+			GLuint gAlbedoSpecAttachmentId;  // Цвет и интенсивность отражения
+			GLuint depthStencilAttachmentId; // Значения глубины-трафарета (для тестов глубины и трафарета)
+			struct { GLuint width; GLuint height; } sizes; // Размеры буфера
+		} gBuffer_;
+
+		/**
+		 * \brief Идентификатор кадрового буфера и его вложений
+		 * \details Во втором проходе будет осуществляться рендеринг в кадровый буфер, с учетом данных их G-буфера (для освещения)
+		 */
 		struct{
-			GLuint fboID;
-			GLuint depthMapID;
-			glm::ivec2 sizes;
-		} shadowMapBuffer_;
+			GLuint frameBufferId;
+			GLuint colorAttachmentId;
+			GLuint depthStencilAttachmentId;
+			struct { GLuint width; GLuint height; } sizes; 
+		} frameBuffer_;
+
+		// Ш Е Й Д Е Р Ы
+
+		/**
+		 * \brief Шейдеры
+		 * \details Перечень основных шейдеров используемых при рендеринге, некоторые задаются, некоторые предустановлены
+		 */
+		struct {
+			ShaderResourcePtr shaderGBuffer_;
+			ShaderResourcePtr shaderLighting_;
+			ShaderResourcePtr shaderPostProcessing_;
+		} shaders_;
+
+		// Г Е О М Е Т Р И Я  П О  У М О Л Ч А Н И Ю
+
+		/**
+		 * \brief Геометрия по умолчанию
+		 * \details Используется для визуализации различных системных объектов (напрример, квадрат, для пост-обработки и т.п.)
+		 */
+		struct{
+			StaticGeometryResourcePtr quad;
+			StaticGeometryResourcePtr cube;
+		} defaultGeometry_;
+
+		// Т Е К С Т У Р Ы  П О  У М О Л Ч А Н Ю
 
 		/**
 		 * \brief Текстурные ресурсы по умолчанию
 		 * \details Если у рисуемых объектов не будет текстуры, они будут взяты отсюда (это однопиксельные текстуры)
 		 */
 		struct{
-			TextureResourcePtr diffuse;
-			TextureResourcePtr detail;
-			TextureResourcePtr specular;
-			TextureResourcePtr bump;
-			TextureResourcePtr flashLightTexture;
+			TextureResourcePtr diffuse;  // Белый пиксель
+			TextureResourcePtr specular; // Балый пиксель
+			TextureResourcePtr bump;     // Синеватный (фиолетовый) пиксель
 		} defaultTextures_;
 
-
-		/**
-		 * \brief Геометрия по умолчанию
-		 * \details Используется для визуализации различных объектов (напр. источники света). В дальнейшем будет убрано
-		 */
-		struct{
-			StaticGeometryResourcePtr cube;
-			StaticGeometryResourcePtr cilinder;
-			StaticGeometryResourcePtr sphere;
-			StaticGeometryResourcePtr quad;
-			StaticGeometryResourcePtr skybox;
-		} defaultGeometry_;
+		// О Б Ъ Е К Т Ы  Д Л Я  В И З У А Л И З А Ц И И
 
 		std::vector<StaticMeshPtr> staticMeshes_;  // Массив статических мешей (указателей)
 		std::vector<LightPtr> lights_;             // Массив источников света (указателей)
+
+		////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 		/**
 		* \brief Запрет копирования через инициализацию
@@ -89,48 +114,66 @@ namespace ogl
 		void Renderer::operator=(const Renderer& other) = delete;
 
 		/**
-		 * \brief Инициализация кадрового буфера
+		 * \brief Инициализация uniform-буферов
+		 * \details В uniform буферах содержатся данные передаваемые в шейдер
+		 */
+		void initUniformBuffers();
+
+		/**
+		 * \brief Очистка uniform-буферов
+		 */
+		void freeUniformBuffers() const;
+
+		/**
+		 * \brief Инициализация G-буффера
 		 * \param width Ширина буфера
 		 * \param height Высота буфера
-		 * \param multisampling Создавать буфер для с учетом мульти-семплинга (сглаживание)
-		 * \param samples Кол-во точек подвыборки на каждый пиксель
 		 */
-		void initFrameBuffer(GLuint width, GLuint height, bool multisampling = false, GLuint samples = 2);
+		void initGBuffer(GLuint width, GLuint height);
 
 		/**
-		 * \brief Инициализация буфера теней (для источника отбрасывающего тени, лол)
-		 * \param width Ширина
-		 * \param height Высота
+		 * \brief Очистка G-буфера
 		 */
-		void initShadowBuffer(GLuint width = 1024, GLuint height = 1024);
+		void freeGBuffer();
 
 		/**
-		 * \brief Де-инициализация кадрового буффера
+		 * \brief Инициализация фрейм-буфера
+		 * \param width Ширина буфера
+		 * \param height Высота буфера
+		 */
+		void initFrameBuffer(GLuint width, GLuint height);
+
+		/**
+		 * \brief Очистка фрейм-буфера
 		 */
 		void freeFrameBuffer();
 
 		/**
-		 * \brief Де-инициализация буфера теней
+		 * \brief Проход для рендеринга геометрии (рендеринг в G-буфер)
+		 * \param shaderID шейдер для рендеринга в G-буфер
+		 * \param clearColor Цвет очистки
+		 * \param clearMask Маска очистки
 		 */
-		void freeShadowBuffer();
+		void renderPassGeometry(GLuint shaderID, glm::vec4 clearColor, GLbitfield clearMask);
 
 		/**
-		 * \brief Получить первый лайт с активным рендерингом теней
-		 * \return Указатель на лайт
+		 * \brief Проход для рендеринга освещенности (рендеринг во фрейм-буфер)
+		 * \param shaderID шейдер для рендеринга во фрейм-буфер
+		 * \param cameraPosition Положение камеры
+		 * \param clearColor Цвет очистки
+		 * \param clearMask Маска очистки
 		 */
-		LightPtr getFirstShadowLight();
+		void renderPassLighting(GLuint shaderID, glm::vec3 cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const;
+
+		/**
+		 * \brief Проход рендеринга для финального представления (рендеринг в основной буфер)
+		 * \param shaderID шейдер для рендеринга во фрейм-буфер
+		 * \param clearColor Цвет очистки
+		 * \param clearMask Маска очистки
+		 */
+		void renderPassFinal(GLuint shaderID, glm::vec4 clearColor, GLbitfield clearMask) const;
 
 	public:
-		/**
-		 * \brief Текстура пятен фонарика
-		 */
-		TextureResourcePtr flashLightTexture;
-
-		/**
-		 * \brief Текстура фонового скай-бокса
-		 */
-		TextureCubicResourcePtr backgroundTexture;
-
 		/**
 		 * \brief Ширина и высота области вида
 		 * \details Соответствует разрешению области показа, позволяет получит пропорцию
@@ -150,12 +193,11 @@ namespace ogl
 		/**
 		 * \brief Конструктор
 		 * \param hwnd Хендл WinAPI окна
-		 * \param shaderBasic Основной шейдер
-		 * \param shaderPostProcessing Шейдер для пост-обработки
-		 * \param msaa Активировать мульти-семплинг
-		 * \param samples Кол-во семплов (если используется мульти-семплинг)
+		 * \param geometry Шейдер для рендеринга геометрии
+		 * \param lightning Шейдер для подсчета освещенности
+		 * \param postProcessing Шейдер для пост-обработки
 		 */
-		Renderer(HWND hwnd, ShaderResourcePtr shaderBasic, ShaderResourcePtr shaderPostProcessing, bool msaa = false, GLuint samples = 2);
+		Renderer(HWND hwnd, ShaderResourcePtr geometry, ShaderResourcePtr lightning, ShaderResourcePtr postProcessing);
 
 		/**
 		 * \brief Освобождение памяти

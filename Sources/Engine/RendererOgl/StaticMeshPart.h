@@ -27,7 +27,7 @@ namespace ogl
 		 * \param leftHanded Левостороняя система
 		 * \return Матрица поворота
 		 */
-		glm::mat4 getRotMatrix(bool leftHanded = false) const;
+		glm::mat2 getRotMatrix(bool leftHanded = false) const;
 	};
 
 	/**

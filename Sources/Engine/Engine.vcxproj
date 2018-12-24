@@ -54,8 +54,9 @@
     <ClInclude Include="Tools\FileTools.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\Shaders\basic.glsl" />
-    <None Include="..\..\Shaders\post-processing.glsl" />
+    <None Include="..\..\Shaders\geometry.glsl" />
+    <None Include="..\..\Shaders\lighting.glsl" />
+    <None Include="..\..\Shaders\post.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{97E7F44E-937D-4C79-9272-E6C507B7D2C5}</ProjectGuid>

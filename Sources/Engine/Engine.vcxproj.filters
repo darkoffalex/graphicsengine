@@ -127,10 +127,13 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\Shaders\basic.glsl">
+    <None Include="..\..\Shaders\geometry.glsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="..\..\Shaders\post-processing.glsl">
+    <None Include="..\..\Shaders\lighting.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\..\Shaders\post.glsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

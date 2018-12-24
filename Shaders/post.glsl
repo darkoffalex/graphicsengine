@@ -5,14 +5,20 @@
 layout(location = 0) in vec3 position;   // Положение
 layout(location = 2) in vec2 uv;         // Текстурные координаты
 
-// Выход шейдера
-out vec2 vsoUV;
+// Выходные значения шейдера
+out VS_OUT
+{
+	vec2 uv;
+} vs_out;
 
+// Основная функция вершинного шейдера
+// По сути передача положений вершин и UV-координат в следующие этапы, как есть
 void main()
 {
 	gl_Position = vec4(position.x, position.y, 0.0, 1.0);
-	vsoUV = uv;
+	vs_out.uv = uv;
 }
+
 /*VERTEX-SHADER-END*/
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -20,18 +26,23 @@ void main()
 /*FRAGMENT-SHADER-BEGIN*/
 #version 330 core
 
-// Вход шейдера
-in vec2 vsoUV;
-
 // Выход шейдера
-out vec4 color;
+layout (location = 0) out vec4 color;
 
-// Текстура экрана
+// Значения принятые на вход с предыдущих этапов
+in VS_OUT
+{
+	vec2 uv;
+} fs_in;
+
+// Текстуры
 uniform sampler2D screenTexture;
 
 // Сдвиг текстурных координат для выборки соседних текселей
-const float offset = 0.003;  
+const float offset = 0.003;
 
+// Основная функция фрагментного шейдера
+// Вычисление итогового цвета фрагмента с учетом пост-обработки
 void main()
 {
 	// Массив сдвигов UV координат для получения соседних текселей текстуры
@@ -43,26 +54,22 @@ void main()
 
 	// Коэфициенты умножения (сверточное ядро)
 	// Без изменений (исходная картинка)
-    float kernel[9] = float[](
-        0, 0, 0,
-        0, 1, 0,
-        0, 0, 0
-    );
+	float kernel[9] = float[](
+		0, 0, 0,
+		0, 1, 0,
+		0, 0, 0
+	);
 
-	// Размытие
-	//float kernel[9] = float[](
-	//	1.0 / 16, 2.0 / 16, 1.0 / 16,
-	//	2.0 / 16, 4.0 / 16, 2.0 / 16,
-	//	1.0 / 16, 2.0 / 16, 1.0 / 16  
-    //);
-
-	// Подсчет итогового цвета
+	// Результирующий цвет
 	vec3 result;
+
+	// Подсчет результирующего цвета (среднее значение из выборки)
 	for(int i = 0; i < 9; i++){
-		// Умножаем значение из ядра на значение соответствующего текселя и прибавляем к результату
-		result += vec3(texture(screenTexture, vsoUV.xy + offsets[i])) * kernel[i];
+		result += texture(screenTexture, fs_in.uv + offsets[i]).rgb * kernel[i];
 	}
 
+	// Выход шейдера
 	color = vec4(result, 1.0);
 }
+
 /*FRAGMENT-SHADER-END*/

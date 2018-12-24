@@ -72,4 +72,22 @@ namespace ogl
 		glm::ivec2 sizes;                 // Размеры (ширина высота)
 		GLuint samples;                   // Кол-во семплов (используется при мульти-семплинге)
 	};
+
+	/**
+	 * \brief Коэфициенты маппинга текстры
+	 * \details Общий размер структуры должен быть кратен 16, для этого используется выравнивание
+	 */
+	struct Std140TextureMapping
+	{
+		glm::vec2 offset;    // Сдвиг текстуры
+		glm::vec2 origin;    // Центральная точка
+		glm::vec4 scale;     // Масштабирование (vec2 + 8 байт выравнивания)
+		glm::mat4 rotation;  // Поворот (используется только часть 2*2)
+
+		Std140TextureMapping(glm::vec2 offsetIn, glm::vec2 originIn, glm::vec2 scaleIn, glm::mat4 rotationIn) :
+			offset(offsetIn),
+			origin(originIn),
+			scale(scaleIn.x, scaleIn.y, 0.0f, 0.0f),
+			rotation(rotationIn) {}
+	};
 }
