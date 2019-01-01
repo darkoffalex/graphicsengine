@@ -12,6 +12,10 @@
 #include "StaticMesh.h"
 #include "Light.h"
 
+#define MAX_POINT_LIGHTS 32
+#define MAX_DIRECT_LIGHTS 32
+#define MAX_SPOT_LIGHTS 32
+
 namespace ogl
 {
 	/**
@@ -30,8 +34,11 @@ namespace ogl
 		GLuint uboViewProjection_;           // UBO для матриц вида-проекции
 		GLuint uboModel_;                    // UBO для матрицы модели
 		GLuint uboTextureMapping_;           // UBO для коэффициентов маппинга текстур
-		GLuint uboMaterialSettings_;         // UBO для параметров материала
+		//GLuint uboMaterialSettings_;         // UBO для параметров материала
 		GLuint uboPositions_;                // UBO для положения камеры (и каких-либо иных объектов)
+		GLuint uboPointLights_;              // UBO для точечных источников света
+		GLuint uboDirLights_;                // UBO для направленных источников света
+		GLuint uboSpotLights_;               // UBO для источников типа "прожектор"
 
 		// Б У Ф Е Р Ы  К А Д Р А
 
@@ -163,7 +170,7 @@ namespace ogl
 		 * \param clearColor Цвет очистки
 		 * \param clearMask Маска очистки
 		 */
-		void renderPassLighting(GLuint shaderID, glm::vec3 cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const;
+		void renderPassLighting(GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const;
 
 		/**
 		 * \brief Проход рендеринга для финального представления (рендеринг в основной буфер)

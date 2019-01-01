@@ -21,15 +21,21 @@ namespace ogl
 			GLuint viewProjectionGbrUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "viewProjectionMatrices");
 			GLuint modelGbrUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "modelMatrix");
 			GLuint textureMappingUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "textureMapping");
-			GLuint materislSettingsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "materialSettings");
-			GLuint positionsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "positions");
+			//GLuint materislSettingsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "materialSettings");
+			GLuint positionsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "positions");
+			GLuint pointLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "ptLightsUniform");
+			GLuint dirLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "dirLightsUniform");
+			GLuint spotLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "spotLightsUniform");
 
 			// Задаем номера связок этих uniform-блоков у шейдеров
 			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), viewProjectionGbrUboBindingID, 0);
 			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), modelGbrUboBindingID, 1);
 			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), textureMappingUboBindingID, 2);
-			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), materislSettingsUboBindingID, 3);
+			//glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), materislSettingsUboBindingID, 3);
 			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), positionsUboBindingID, 4);
+			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), pointLightsUboBindingID, 5);
+			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), dirLightsUboBindingID, 6);
+			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), spotLightsUboBindingID, 7);
 
 			// Создать UBO-буфер для матриц вида-проекции и выделить память
 			glGenBuffers(1, &uboViewProjection_);
@@ -50,23 +56,46 @@ namespace ogl
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 			// Создать UBO-буфер для параметров маппинга текстуры и выделить память
+			/*
 			glGenBuffers(1, &uboMaterialSettings_);
 			glBindBuffer(GL_UNIFORM_BUFFER, uboMaterialSettings_);
 			glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::vec4) + sizeof(GLfloat), nullptr, GL_STATIC_DRAW);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+			*/
 
-			// Создать UBO-буфер для положений
+			// Создать UBO-буфер для положений (шейдер освещения)
 			glGenBuffers(1, &uboPositions_);
 			glBindBuffer(GL_UNIFORM_BUFFER, uboPositions_);
 			glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec4), nullptr, GL_STATIC_DRAW);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+			// Создать UBO-буфер для точечных источников освещения (шейдер освещения)
+			glGenBuffers(1, &uboPointLights_);
+			glBindBuffer(GL_UNIFORM_BUFFER, uboPointLights_);
+			glBufferData(GL_UNIFORM_BUFFER, (sizeof(glm::vec4) * 2 + sizeof(GLfloat) * 4) * MAX_POINT_LIGHTS, nullptr, GL_STATIC_DRAW);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+			// Создать UBO-буфер для направленных источников освещения (шейдер освещения)
+			glGenBuffers(1, &uboDirLights_);
+			glBindBuffer(GL_UNIFORM_BUFFER, uboDirLights_);
+			glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec4) * 2 * MAX_DIRECT_LIGHTS, nullptr, GL_STATIC_DRAW);
+			glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+			// Создать UBO-буфер для источников освещения типа "фонарик" (шейдер освещения)
+			glGenBuffers(1, &uboSpotLights_);
+			glBindBuffer(GL_UNIFORM_BUFFER, uboSpotLights_);
+			glBufferData(GL_UNIFORM_BUFFER, 128 * MAX_SPOT_LIGHTS, nullptr, GL_STATIC_DRAW);
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 			// Связать область памяти буфера с точками uniform-привязки
 			glBindBufferRange(GL_UNIFORM_BUFFER, 0, this->uboViewProjection_, 0, 2 * sizeof(glm::mat4));
 			glBindBufferRange(GL_UNIFORM_BUFFER, 1, this->uboModel_, 0, sizeof(glm::mat4));
 			glBindBufferRange(GL_UNIFORM_BUFFER, 2, this->uboTextureMapping_, 0, 3 * sizeof(Std140TextureMapping));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 3, this->uboMaterialSettings_, 0, 3 * sizeof(glm::vec4) + sizeof(GLfloat));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 4, this->uboPositions_, 0, sizeof(glm::vec3));
+			//glBindBufferRange(GL_UNIFORM_BUFFER, 3, this->uboMaterialSettings_, 0, 3 * sizeof(glm::vec4) + sizeof(GLfloat));
+			glBindBufferRange(GL_UNIFORM_BUFFER, 4, this->uboPositions_, 0, sizeof(glm::vec4));
+			glBindBufferRange(GL_UNIFORM_BUFFER, 5, this->uboPointLights_, 0, (sizeof(glm::vec4) * 2 + sizeof(GLfloat) * 4) * MAX_POINT_LIGHTS);
+			glBindBufferRange(GL_UNIFORM_BUFFER, 6, this->uboDirLights_, 0, sizeof(glm::vec4) * 2 * MAX_DIRECT_LIGHTS);
+			glBindBufferRange(GL_UNIFORM_BUFFER, 7, this->uboSpotLights_, 0, 128 * MAX_SPOT_LIGHTS);
 
 		}
 	}
@@ -78,6 +107,11 @@ namespace ogl
 	{
 		if (uboViewProjection_) glDeleteBuffers(1, &uboViewProjection_);
 		if (uboModel_) glDeleteBuffers(1, &uboModel_);
+		if (uboTextureMapping_) glDeleteBuffers(1, &uboTextureMapping_);
+		if (uboPositions_) glDeleteBuffers(1, &uboPositions_);
+		if (uboPointLights_) glDeleteBuffers(1, &uboPointLights_);
+		if (uboDirLights_) glDeleteBuffers(1, &uboDirLights_);
+		if (uboSpotLights_) glDeleteBuffers(1, &uboSpotLights_);
 	}
 
 	/**
@@ -309,13 +343,14 @@ namespace ogl
 
 
 				// Обновляем области UBO-буфера параметров материала
+				/*
 				glBindBuffer(GL_UNIFORM_BUFFER, uboMaterialSettings_);
 				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::vec4), glm::value_ptr(part.material.ambientСolor));
 				glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(part.material.diffuseColor));
 				glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(part.material.specularColor));
 				glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::vec4), sizeof(GLfloat), &part.material.shininess);
 				glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
+				*/
 
 				// Привязать VAO
 				glBindVertexArray(part.getGeometry()->getVaoId());
@@ -343,7 +378,7 @@ namespace ogl
 	* \param clearColor Цвет очистки
 	* \param clearMask Маска очистки
 	*/
-	void Renderer::renderPassLighting(GLuint shaderID, glm::vec3 cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const
+	void Renderer::renderPassLighting(GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const
 	{
 		// Установка размеров области вида
 		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
@@ -380,12 +415,39 @@ namespace ogl
 		// Передать значения положений фрагментов в шейдер
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, this->gBuffer_.gPositionAttachmentId);
-		glUniform1i(glGetUniformLocation(shaderID, "positionTexture"), 0);
+		glUniform1i(glGetUniformLocation(shaderID, "positionTexture"), 1);
 
 		// Передать значения нормалей фрагментов в шейдер
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, this->gBuffer_.gNormalAttachmentId);
-		glUniform1i(glGetUniformLocation(shaderID, "normalTexture"), 0);
+		glUniform1i(glGetUniformLocation(shaderID, "normalTexture"), 2);
+
+		// Если не пуст массив источников света
+		if(!this->lights_.empty())
+		{
+			GLuint pointLights = 0;         // Итератор точечных источников
+			//GLuint directionalLights = 0;   // Итератор направленных источников
+			//GLuint spotLights = 0;          // Итератор фонариков-прожекторов
+
+			// Пройти по всем источникам
+			for(auto light : this->lights_)
+			{
+				// Если это точечный источник
+				if(light->getType() == LightType::POINT_LIGHT)
+				{
+					// Создать структуру формата std 140 
+					Std140PointLightSettings settings(light->position,light->color,light->attenuation.linear,light->attenuation.quadratic);
+
+					// Обновить часть буфера соответствующую этому источнику света
+					glBindBuffer(GL_UNIFORM_BUFFER, uboPointLights_);
+					glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Std140PointLightSettings)*pointLights, sizeof(Std140PointLightSettings), &settings);
+					glBindBuffer(GL_UNIFORM_BUFFER, 0);
+					
+					//Увеличить итератор точечных источников
+					pointLights++;
+				}
+			}
+		}
 
 		// Отрисовать VAO
 		glDrawElements(GL_TRIANGLES, this->defaultGeometry_.quad->getIndexCount(), GL_UNSIGNED_INT, nullptr);
@@ -490,13 +552,13 @@ namespace ogl
 
 		// с м е ш и в а н и е  ц в е т о в (а л ь ф а - к а н а л)
 
-		// Включить режим смешивания цветов (по умолчанию)
-		glEnable(GL_BLEND);
-		// Функция смешивания (по умолчанию)
+		// Поскольку у нас отложенное затенение, смешивания по альфа-каналу можно (нужно) выключить
+		glDisable(GL_BLEND);
+		// Функция смешивания (по умолчанию, не используется, поскольку GL_BLEND отключен)
 		// Цвет, который накладывается поверх другого, множится на свой альфа-канал
 		// Цвет, на который накладывается другой цвет, множится на единицу минус альфа канал наложенного цвета
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		// Значения цветов при смешивании (наложении) складываются
+		// Значения цветов при смешивании (наложении) складываются (не используется, поскольку GL_BLEND отключен)
 		glBlendEquation(GL_FUNC_ADD);
 
 		// т е с т  т р а ф а р е т а
@@ -679,7 +741,7 @@ namespace ogl
 		GLuint postProcessingShaderID = this->shaders_.shaderPostProcessing_->getId();
 
 		// Отрендерить кадр с геометрией, записать значения положений, нормалей, цветов фрагментов в G-буфер
-		this->renderPassGeometry(geometryShaderID, clearColor, clearMask);
+		this->renderPassGeometry(geometryShaderID, { 0.0f,0.0f,0.0f,0.0f }, clearMask);
 		// Используя данные из G-буфера произвести расчет освещенности (запись во фрейм-буфер)
 		this->renderPassLighting(lightingShaderID, this->cameraPosition, clearColor, GL_COLOR_BUFFER_BIT);
 		// Осуществить пост-обработку полученного кадра, на основе цветового вложения фрейм-буфера (запись в основной буфер)

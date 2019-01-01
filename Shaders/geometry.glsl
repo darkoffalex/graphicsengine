@@ -236,6 +236,6 @@ void main()
 	// Цвет фрагмента
 	gAlbedoSpec.rgb = fs_in.color * texture(diffuseTexture, fs_in.uvDiffuse).rgb;
 	// Интенсивность отражения фрагмента
-	gAlbedoSpec.a = texture(specularTexture, fs_in.uvSpecular).r;	
+	gAlbedoSpec.a = texture(specularTexture, fs_in.uvSpecular).r;
 }
 /*FRAGMENT-SHADER-END*/

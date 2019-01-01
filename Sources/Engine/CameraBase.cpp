@@ -78,7 +78,7 @@ glm::vec3 CameraBase::getDirection() const
 	// Вектор направления повернуть при помощи матрицы на нужные углы
 	glm::vec4 direction = rot * glm::vec4(0.0f, 0.0f, -1.0f, 1.0f);
 
-	return glm::vec3(direction.x, direction.y, direction.z);
+	return glm::normalize(glm::vec3(direction.x, direction.y, direction.z));
 }
 
 /**
@@ -87,7 +87,7 @@ glm::vec3 CameraBase::getDirection() const
 */
 glm::vec3 CameraBase::getRight() const
 {
-	return glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), this->getDirection());
+	return glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), this->getDirection()));
 }
 
 /**

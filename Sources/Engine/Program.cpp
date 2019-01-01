@@ -298,8 +298,8 @@ void Init(ogl::Renderer* pRenderer)
 
 	// Добавить источники света, настроить его положение
 	//ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
-	//ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
-	//ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 }
 
 /**
