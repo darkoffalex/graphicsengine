@@ -29,17 +29,6 @@ namespace ogl
 		glm::mat4 viewMatrix_;               // Матрица вида
 		glm::mat4 projectionMatrix_;         // Матрица проекции
 
-		// U B O
-
-		GLuint uboViewProjection_;           // UBO для матриц вида-проекции
-		GLuint uboModel_;                    // UBO для матрицы модели
-		GLuint uboTextureMapping_;           // UBO для коэффициентов маппинга текстур
-		//GLuint uboMaterialSettings_;         // UBO для параметров материала
-		GLuint uboPositions_;                // UBO для положения камеры (и каких-либо иных объектов)
-		GLuint uboPointLights_;              // UBO для точечных источников света
-		GLuint uboDirLights_;                // UBO для направленных источников света
-		GLuint uboSpotLights_;               // UBO для источников типа "прожектор"
-
 		// Б У Ф Е Р Ы  К А Д Р А
 
 		/**
@@ -121,17 +110,6 @@ namespace ogl
 		void Renderer::operator=(const Renderer& other) = delete;
 
 		/**
-		 * \brief Инициализация uniform-буферов
-		 * \details В uniform буферах содержатся данные передаваемые в шейдер
-		 */
-		void initUniformBuffers();
-
-		/**
-		 * \brief Очистка uniform-буферов
-		 */
-		void freeUniformBuffers() const;
-
-		/**
 		 * \brief Инициализация G-буффера
 		 * \param width Ширина буфера
 		 * \param height Высота буфера
@@ -180,6 +158,21 @@ namespace ogl
 		 */
 		void renderPassFinal(GLuint shaderID, glm::vec4 clearColor, GLbitfield clearMask) const;
 
+		/**
+		 * \brief Передать в шейдер структуру маппинга текстуры
+		 * \param shaderId ID шейдера
+		 * \param mapping Структура маппинга
+		 * \param uniformName Наименование uniform переменной
+		 */
+		void texMappingToShader(GLuint shaderId, const TextureMapping& mapping, std::string uniformName) const;
+		
+		/**
+		 * \brief Передать в шейдер параметры источника света
+		 * \param shaderId ID шейдера
+		 * \param light Указатель на источник света
+		 * \param index Индекс источника в массиве
+		 */
+		void lightSettingsToShader(GLuint shaderId, LightPtr light, GLuint index) const;
 	public:
 		/**
 		 * \brief Ширина и высота области вида

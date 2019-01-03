@@ -87,29 +87,13 @@ in VS_OUT
 	vec2 uv;
 } fs_in;
 
-// UBO-блок с положениями
-layout (std140) uniform positions
-{
-	vec3 cameraPosition;
-};
+// Uniform-переменная для положения камеры
+uniform vec3 cameraPosition;
 
-// UBO-блок с параметрами источников света (точечных)
-layout(std140) uniform ptLightsUniform
-{
-	PointLight[MAX_POINT_LIGHTS] pointLights;
-};
-
-// UBO-блок с параметрами источников света (направленных)
-layout(std140) uniform dirLightsUniform
-{
-	DirectLight[MAX_DIRECT_LIGHTS] directionalLights;
-};
-
-// UBO-блок с параметрами источников света (прожекторов)
-layout(std140) uniform spotLightsUniform
-{
-	SpotLight[MAX_SPOT_LIGHTS] spotLights;
-};
+// Uniform-переменные для источников света
+uniform PointLight pointLights[MAX_POINT_LIGHTS];
+uniform DirectLight directionalLights[MAX_DIRECT_LIGHTS];
+uniform SpotLight spotLights[MAX_SPOT_LIGHTS];
 
 // Текстуры
 uniform sampler2D albedoSpecularTexture;
@@ -134,13 +118,74 @@ vec3 calculatePointLightComponent(PointLight light, FragmentSettings fragment, M
 	float diffuseBrightness = max(dot(fragment.normal, lightDir), 0.0);
 	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * fragment.color;
 
-	// Бликовый (specular) зависит от угла между вектором взгляда и отроженным относительно нормали вектором падения света на фрагмент
+	// Бликовый (specular) зависит от угла между вектором взгляда и отраженным относительно нормали вектором падения света на фрагмент
 	vec3 reflectedLightDir = reflect(-lightDir, fragment.normal);
 	float specularBrightness = pow(max(dot(fragmentToView, reflectedLightDir), 0.0), material.shininess);
 	vec3 specular = light.color * (specularBrightness * material.specularColor) * fragment.specularity;
 
 	// Вернуть сумму всех компонентов
 	return ((ambient * attenuation) + (diffuse * attenuation) + (specular * attenuation));
+}
+
+// Вычислить освещенность фрагмента направленным источником
+vec3 calculateDirectLightComponent(DirectLight light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
+{
+	// Вектор из фрагмента в камеру (обратное направление взгляда)
+	vec3 fragmentToView = normalize(viewPosition - fragment.position);
+
+	// Фоновый (ambient) цвет просто равномерно заполняет каждый фрагмент
+	vec3 ambient = light.color * material.ambientColor * fragment.color;
+
+	// Рассеянный (diffuse) зависит от угла между нормалью фрагмента и вектором падения света на фрагмент
+	vec3 lightDir = normalize(light.direction);
+	float diffuseBrightness = max(dot(fragment.normal, -lightDir), 0.0);
+	vec3 diffuse = light.color * (diffuseBrightness * material.diffuseColor) * fragment.color;
+
+	// Бликовый (specular) зависит от угла между вектором взгляда и отраженным относительно нормали вектором падения света на фрагмент
+	vec3 reflectedLightDir = reflect(lightDir, fragment.normal);
+	float specularBrightness = pow(max(dot(fragmentToView, reflectedLightDir), 0.0), material.shininess);
+	vec3 specular = light.color * (specularBrightness * material.specularColor) * fragment.specularity;
+
+	// Вернуть сумму всех компонентов
+	return ambient + diffuse + specular;
+}
+
+// Вычислить освещенность фрагмента фонариком-прожектором
+vec3 calculateSpotLightComponent(SpotLight light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
+{
+	// Вектор из фрагмента в камеру (обратное направление взгляда)
+	vec3 fragmentToView = normalize(viewPosition - fragment.position);
+
+	// Вектор падения света (от фрагмента к источнику)
+	vec3 lightDir = normalize(light.position.xyz - fragment.position);
+
+	// Косинус угла между вектором падения света и вектором направления источника
+	float thetaCos = dot(lightDir, normalize(-light.direction.xyz));
+
+	// Разница косинусов между углом внутреннего конуса и углом внешнего
+	float epsilon = light.cutOffCos - light.cutOffOuterCos;
+
+	// Свет наиболее интенсивен в центре (где thetaCos - 1, угол между лучем и направлением фонарика - 0)
+	// К краям интенсивность спадает. Благодаря коэффициенту epsilon есть так же яркое пятно внутри (внутр. конус)
+	float intensity = clamp((thetaCos - light.cutOffOuterCos) / epsilon, 0.0, 1.0);
+
+	//TODO: Интенсивность из текстурной карты фонарика
+
+	// Рассеянный (diffuse)
+	float diffuseBrightness = max(dot(fragment.normal,lightDir), 0.0);
+	vec3 diffuse = light.color.rgb * (diffuseBrightness * material.diffuseColor) * fragment.color;
+
+	// Бликовый (specular)
+	vec3 reflectedLightDir = reflect(-lightDir, fragment.normal);  
+	float specularBrightness = pow(max(dot(fragmentToView, reflectedLightDir), 0.0), material.shininess);
+	vec3 specular = light.color.rgb * (specularBrightness * material.specularColor) * fragment.specularity;
+
+	// Коэффициент затухания (использует расстояние до источника, а так же спец-коэффициенты источника)
+	float distance = length(light.position.xyz - fragment.position);
+	float attenuation = 1.0f / (1.0f + light.linear * distance + light.quadratic * (distance * distance));
+
+	// Вернуть сумму всех компонентов
+	return ((diffuse * intensity * attenuation) + (specular * intensity * attenuation));
 }
 
 // Основная функция фрагментного шейдера
@@ -167,6 +212,16 @@ void main()
 	// Пройтись по массиву точечных источников света
 	for(int i = 0; i < MAX_POINT_LIGHTS; i++){
 		resultColor += calculatePointLightComponent(pointLights[i], fragment, material, cameraPosition);
+	}
+
+	// Пройтись по массиву направленных источников
+	for(int i = 0; i < MAX_DIRECT_LIGHTS; i++){
+		resultColor += calculateDirectLightComponent(directionalLights[i], fragment, material, cameraPosition);
+	}
+
+	// Пройтись по массиву прожекторов-фонариков
+	for(int i = 0; i < MAX_SPOT_LIGHTS; i++){
+		resultColor += calculateSpotLightComponent(spotLights[i], fragment, material, cameraPosition);
 	}
 
 	// Итоговый цвет

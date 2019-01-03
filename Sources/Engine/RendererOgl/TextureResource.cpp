@@ -15,8 +15,9 @@ namespace ogl
 	* \param height Высота
 	* \param bpp Байт на пиксель
 	* \param generateMipmaps Автоматически генерировать мип-мапы
+	* \param type Тип данных для инициализации текстуры (GL_UNSIGNED_BYTE, GL_FLOAT)
 	*/
-	TextureResource::TextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps) :
+	TextureResource::TextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps, GLuint type) :
 		width_(width),
 		height_(height),
 		bpp_(bpp),
@@ -57,7 +58,7 @@ namespace ogl
 		}
 
 		// Устанавливаем данные тексткры (загрузка в текстурную память)
-		glTexImage2D(GL_TEXTURE_2D, 0, format, this->width_, this->height_, 0, format, GL_UNSIGNED_BYTE, textureData);
+		glTexImage2D(GL_TEXTURE_2D, 0, format, this->width_, this->height_, 0, format, type, textureData);
 
 		// Генерация мип-мапов (если нужно)
 		if (this->mipmaps_) {
@@ -119,10 +120,11 @@ namespace ogl
 	* \param height Высота
 	* \param bpp Байт на пиксель
 	* \param generateMipmaps Автоматически генерировать мип-мапы
+	* \param type Тип данных для инициализации текстуры (GL_UNSIGNED_BYTE, GL_FLOAT)
 	* \return Умный указатель на ресурс
 	*/
-	TextureResourcePtr MakeTextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps)
+	TextureResourcePtr MakeTextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps, GLuint type)
 	{
-		return std::make_shared<TextureResource>(textureData, width, height, bpp, generateMipmaps);
+		return std::make_shared<TextureResource>(textureData, width, height, bpp, generateMipmaps, type);
 	}
 }

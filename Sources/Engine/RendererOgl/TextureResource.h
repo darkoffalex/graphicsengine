@@ -39,8 +39,9 @@ namespace ogl
 		 * \param height Высота
 		 * \param bpp Байт на пиксель
 		 * \param generateMipmaps Автоматически генерировать мип-мапы
+		 * \param type Тип данных для инициализации текстуры (GL_UNSIGNED_BYTE, GL_FLOAT)
 		 */
-		TextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps = false);
+		TextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps = false, GLuint type = GL_UNSIGNED_BYTE);
 
 		/**
 		 * \brief Деструктор, уничтожает OpenGL буфер
@@ -85,7 +86,8 @@ namespace ogl
 	 * \param height Высота
 	 * \param bpp Байт на пиксель
 	 * \param generateMipmaps Автоматически генерировать мип-мапы
+	 * \param type Тип данных для инициализации текстуры (GL_UNSIGNED_BYTE, GL_UNSIGNED_FLOAT)
 	 * \return Умный указатель на ресурс
 	 */
-	TextureResourcePtr MakeTextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps = false);
+	TextureResourcePtr MakeTextureResource(void* textureData, GLuint width, GLuint height, GLuint bpp, bool generateMipmaps = false, GLuint type = GL_UNSIGNED_BYTE);
 }

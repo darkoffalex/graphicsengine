@@ -75,38 +75,12 @@ namespace ogl
 
 	/**
 	 * \brief Коэфициенты маппинга текстры
-	 * \details Общий размер структуры должен быть кратен 16, для этого используется выравнивание
 	 */
-	struct Std140TextureMapping
+	struct TextureMapping
 	{
-		glm::vec2 offset;    // Сдвиг текстуры
-		glm::vec2 origin;    // Центральная точка
-		glm::vec4 scale;     // Масштабирование (vec2 + 8 байт выравнивания)
-		glm::mat4 rotation;  // Поворот (используется только часть 2*2)
-
-		Std140TextureMapping(glm::vec2 offsetIn, glm::vec2 originIn, glm::vec2 scaleIn, glm::mat4 rotationIn) :
-			offset(offsetIn),
-			origin(originIn),
-			scale(scaleIn.x, scaleIn.y, 0.0f, 0.0f),
-			rotation(rotationIn) {}
-	};
-
-	/**
-	 * \brief Параметры точечного источника освещения
-	 * \details Общий размер структуры должен быть кратен 16, для этого используется выравнивание
-	 */
-	struct Std140PointLightSettings
-	{
-		glm::vec4 position;  // Положение (vec3 + 4 байта выравнивания)
-		glm::vec4 color;     // Цвет (vec3 + 4 байта выравнивания)
-		GLfloat linear;      // Линейкный коэффициент затухания
-		GLfloat quadratic;   // Квадратичный коэффициент затухания
-		glm::vec2 padding;   // 8 байт выравнивания (для кратности ощего размера)
-
-		Std140PointLightSettings(glm::vec3 positionIn, glm::vec3 colorIn, GLfloat linearIn, GLfloat quadraticIn) :
-			position({ positionIn.x,positionIn.y,positionIn.z,0.0f }),
-			color({ colorIn.r,colorIn.g,colorIn.b,0.0f }),
-			linear(linearIn),
-			quadratic(quadraticIn) {}
+		glm::vec2 offset;
+		glm::vec2 origin;
+		glm::vec2 scale;
+		glm::mat2 rotation;
 	};
 }

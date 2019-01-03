@@ -297,7 +297,7 @@ void Init(ogl::Renderer* pRenderer)
 	cube->scale = { 0.5f,0.5f,0.5f };
 
 	// Добавить источники света, настроить его положение
-	//ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
 	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 }
@@ -308,6 +308,8 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
+	_pRenderer->getLights()[0]->rotation.x += frameDeltaMs * 0.05f;
+
 	// Если есть камера
 	if(_pCamera != nullptr)
 	{

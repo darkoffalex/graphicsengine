@@ -13,30 +13,18 @@ struct TextureMapping
 	vec2 offset;
 	vec2 origin;
 	vec2 scale;
-	mat4 rotation;
+	mat2 rotation;
 };
 
-// UBO-блок с матрицами вида-проекции
-layout (std140) uniform viewProjectionMatrices
-{
-	mat4 projection;
-	mat4 view;
-};
+// Uniform-переменные матриц
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
 
-// UBO-блок с матрицей модели
-layout (std140) uniform modelMatrix
-{
-	mat4 model;
-};
-
-
-// UBO-блок с параметрами маппинга текстур
-layout(std140) uniform textureMapping
-{
-	TextureMapping diffuseTexMapping;
-	TextureMapping specularTexMapping;
-	TextureMapping bumpTexMapping;
-};
+// Uniform-переменные для параметров маппинга текстур
+uniform TextureMapping diffuseTexMapping;
+uniform TextureMapping specularTexMapping;
+uniform TextureMapping bumpTexMapping;
 
 // Выходные значения шейдера
 // Почти все эти значения будут интерполироваться для каждого фрагмента
@@ -77,9 +65,9 @@ void main()
 	vs_out.vertexPosLoc = position;
 
 	// Передать координаты текстур с учетом трансформаций
-	vs_out.uvDiffuse = (mat2(diffuseTexMapping.rotation) * (uv - diffuseTexMapping.origin)) * diffuseTexMapping.scale + diffuseTexMapping.origin + diffuseTexMapping.offset;
-	vs_out.uvSpecular = (mat2(specularTexMapping.rotation) * (uv - specularTexMapping.origin)) * specularTexMapping.scale + specularTexMapping.origin + specularTexMapping.offset;
-	vs_out.uvBump = (mat2(bumpTexMapping.rotation) * (uv - bumpTexMapping.origin)) * bumpTexMapping.scale + bumpTexMapping.origin + bumpTexMapping.offset;
+	vs_out.uvDiffuse = (diffuseTexMapping.rotation * (uv - diffuseTexMapping.origin)) * diffuseTexMapping.scale + diffuseTexMapping.origin + diffuseTexMapping.offset;
+	vs_out.uvSpecular = (specularTexMapping.rotation * (uv - specularTexMapping.origin)) * specularTexMapping.scale + specularTexMapping.origin + specularTexMapping.offset;
+	vs_out.uvBump = (bumpTexMapping.rotation * (uv - bumpTexMapping.origin)) * bumpTexMapping.scale + bumpTexMapping.origin + bumpTexMapping.offset;
 }
 
 /*VERTEX-SHADER-END*/
@@ -207,15 +195,6 @@ in GS_OUT
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
 uniform sampler2D bumpTexture;
-
-// UBO-блок с параметрами материала
-layout(std140) uniform materialSettings
-{
-	vec3 ambientColor;
-	vec3 diffuseColor;
-	vec3 specularColor;
-	float shininess;
-};
 
 // Результрующий цвет фрагмента
 //out vec4 color;

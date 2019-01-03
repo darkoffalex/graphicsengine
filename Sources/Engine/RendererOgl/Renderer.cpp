@@ -10,111 +10,6 @@ namespace ogl
 	extern bool _isGlewInitialised;
 
 	/**
-	* \brief Инициализация uniform-буферов
-	* \details В uniform буферах содержатся данные передаваемые в шейдер
-	*/
-	void Renderer::initUniformBuffers()
-	{
-		if (this->shaders_.shaderGBuffer_)
-		{
-			// Получить идентификаторы uniform-блоков объявленых в шейдере
-			GLuint viewProjectionGbrUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "viewProjectionMatrices");
-			GLuint modelGbrUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "modelMatrix");
-			GLuint textureMappingUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "textureMapping");
-			//GLuint materislSettingsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderGBuffer_->getId(), "materialSettings");
-			GLuint positionsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "positions");
-			GLuint pointLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "ptLightsUniform");
-			GLuint dirLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "dirLightsUniform");
-			GLuint spotLightsUboBindingID = glGetUniformBlockIndex(this->shaders_.shaderLighting_->getId(), "spotLightsUniform");
-
-			// Задаем номера связок этих uniform-блоков у шейдеров
-			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), viewProjectionGbrUboBindingID, 0);
-			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), modelGbrUboBindingID, 1);
-			glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), textureMappingUboBindingID, 2);
-			//glUniformBlockBinding(this->shaders_.shaderGBuffer_->getId(), materislSettingsUboBindingID, 3);
-			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), positionsUboBindingID, 4);
-			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), pointLightsUboBindingID, 5);
-			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), dirLightsUboBindingID, 6);
-			glUniformBlockBinding(this->shaders_.shaderLighting_->getId(), spotLightsUboBindingID, 7);
-
-			// Создать UBO-буфер для матриц вида-проекции и выделить память
-			glGenBuffers(1, &uboViewProjection_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboViewProjection_);
-			glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для матрицы модели и выделить память
-			glGenBuffers(1, &uboModel_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboModel_);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для параметров маппинга текстуры и выделить память
-			glGenBuffers(1, &uboTextureMapping_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboTextureMapping_);
-			glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(Std140TextureMapping), nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для параметров маппинга текстуры и выделить память
-			/*
-			glGenBuffers(1, &uboMaterialSettings_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboMaterialSettings_);
-			glBufferData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::vec4) + sizeof(GLfloat), nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-			*/
-
-			// Создать UBO-буфер для положений (шейдер освещения)
-			glGenBuffers(1, &uboPositions_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboPositions_);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec4), nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для точечных источников освещения (шейдер освещения)
-			glGenBuffers(1, &uboPointLights_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboPointLights_);
-			glBufferData(GL_UNIFORM_BUFFER, (sizeof(glm::vec4) * 2 + sizeof(GLfloat) * 4) * MAX_POINT_LIGHTS, nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для направленных источников освещения (шейдер освещения)
-			glGenBuffers(1, &uboDirLights_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboDirLights_);
-			glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec4) * 2 * MAX_DIRECT_LIGHTS, nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Создать UBO-буфер для источников освещения типа "фонарик" (шейдер освещения)
-			glGenBuffers(1, &uboSpotLights_);
-			glBindBuffer(GL_UNIFORM_BUFFER, uboSpotLights_);
-			glBufferData(GL_UNIFORM_BUFFER, 128 * MAX_SPOT_LIGHTS, nullptr, GL_STATIC_DRAW);
-			glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-			// Связать область памяти буфера с точками uniform-привязки
-			glBindBufferRange(GL_UNIFORM_BUFFER, 0, this->uboViewProjection_, 0, 2 * sizeof(glm::mat4));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 1, this->uboModel_, 0, sizeof(glm::mat4));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 2, this->uboTextureMapping_, 0, 3 * sizeof(Std140TextureMapping));
-			//glBindBufferRange(GL_UNIFORM_BUFFER, 3, this->uboMaterialSettings_, 0, 3 * sizeof(glm::vec4) + sizeof(GLfloat));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 4, this->uboPositions_, 0, sizeof(glm::vec4));
-			glBindBufferRange(GL_UNIFORM_BUFFER, 5, this->uboPointLights_, 0, (sizeof(glm::vec4) * 2 + sizeof(GLfloat) * 4) * MAX_POINT_LIGHTS);
-			glBindBufferRange(GL_UNIFORM_BUFFER, 6, this->uboDirLights_, 0, sizeof(glm::vec4) * 2 * MAX_DIRECT_LIGHTS);
-			glBindBufferRange(GL_UNIFORM_BUFFER, 7, this->uboSpotLights_, 0, 128 * MAX_SPOT_LIGHTS);
-
-		}
-	}
-
-	/**
-	* \brief Очистка uniform-буферов
-	*/
-	void Renderer::freeUniformBuffers() const
-	{
-		if (uboViewProjection_) glDeleteBuffers(1, &uboViewProjection_);
-		if (uboModel_) glDeleteBuffers(1, &uboModel_);
-		if (uboTextureMapping_) glDeleteBuffers(1, &uboTextureMapping_);
-		if (uboPositions_) glDeleteBuffers(1, &uboPositions_);
-		if (uboPointLights_) glDeleteBuffers(1, &uboPointLights_);
-		if (uboDirLights_) glDeleteBuffers(1, &uboDirLights_);
-		if (uboSpotLights_) glDeleteBuffers(1, &uboSpotLights_);
-	}
-
-	/**
 	* \brief Инициализация G-буффера
 	* \param width Ширина буфера
 	* \param height Высота буфера
@@ -274,11 +169,9 @@ namespace ogl
 		// Использовать шейдер
 		glUseProgram(shaderID);
 
-		// Обновляем области UBO-буфера содержащие матрицы проекции
-		glBindBuffer(GL_UNIFORM_BUFFER, uboViewProjection_);
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(this->projectionMatrix_));
-		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(this->viewMatrix_));
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		// Пеередать матрицы вида и проекции в шейдер
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
 
 		// Включить тест глубины
 		glEnable(GL_DEPTH_TEST);
@@ -292,26 +185,19 @@ namespace ogl
 			// Пройтись по всем частям меша
 			for (auto part : staticMesh->getParts())
 			{
-				// Получить матрицу модели
+				// Передать матрицу модели в шейдер
 				glm::mat4 mdodelMatrix = staticMesh->getModelMatrix();
-
-				// Обновить UBO-буфер, содержащий матрицу модели в шейдере
-				glBindBuffer(GL_UNIFORM_BUFFER, uboModel_);
-				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(mdodelMatrix));
-				glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
+				glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
 
 				// Получить структуры коэфициентов маппинга
-				Std140TextureMapping diffuseTextureMapping = { part.diffuseTexture.offset,{ 0.0f,0.0f },part.diffuseTexture.scale,part.diffuseTexture.getRotMatrix() };
-				Std140TextureMapping speculaTextureMapping = { part.specularTexture.offset,{ 0.0f,0.0f },part.specularTexture.scale,part.specularTexture.getRotMatrix() };
-				Std140TextureMapping bumpTextureMapping = { part.bumpTexture.offset,{ 0.0f,0.0f },part.bumpTexture.scale,part.bumpTexture.getRotMatrix() };
+				TextureMapping diffuseTextureMapping = { part.diffuseTexture.offset,{ 0.0f,0.0f },part.diffuseTexture.scale,part.diffuseTexture.getRotMatrix() };
+				TextureMapping speculaTextureMapping = { part.specularTexture.offset,{ 0.0f,0.0f },part.specularTexture.scale,part.specularTexture.getRotMatrix() };
+				TextureMapping bumpTextureMapping = { part.bumpTexture.offset,{ 0.0f,0.0f },part.bumpTexture.scale,part.bumpTexture.getRotMatrix() };
 
-				// Обновляем области UBO-буфера коэфициенты маппинга
-				glBindBuffer(GL_UNIFORM_BUFFER, uboTextureMapping_);
-				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Std140TextureMapping), &diffuseTextureMapping);
-				glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Std140TextureMapping), sizeof(Std140TextureMapping), &speculaTextureMapping);
-				glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(Std140TextureMapping), sizeof(Std140TextureMapping), &bumpTextureMapping);
-				glBindBuffer(GL_UNIFORM_BUFFER, 0);
+				// Отправить маппинг текстур в шейдер
+				this->texMappingToShader(shaderID, diffuseTextureMapping, "diffuseTexMapping");
+				this->texMappingToShader(shaderID, speculaTextureMapping, "specularTexMapping");
+				this->texMappingToShader(shaderID, bumpTextureMapping, "bumpTexMapping");
 
 
 				// Получить ID'ы текстур (если установлены - их, если нет, тех что по умолчанию)
@@ -340,17 +226,6 @@ namespace ogl
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, part.bumpTexture.wrapS);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, part.bumpTexture.wrapT);
 				glUniform1i(glGetUniformLocation(shaderID, "bumpTexture"), 2);
-
-
-				// Обновляем области UBO-буфера параметров материала
-				/*
-				glBindBuffer(GL_UNIFORM_BUFFER, uboMaterialSettings_);
-				glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::vec4), glm::value_ptr(part.material.ambientСolor));
-				glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(part.material.diffuseColor));
-				glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::vec4), sizeof(glm::vec4), glm::value_ptr(part.material.specularColor));
-				glBufferSubData(GL_UNIFORM_BUFFER, 3 * sizeof(glm::vec4), sizeof(GLfloat), &part.material.shininess);
-				glBindBuffer(GL_UNIFORM_BUFFER, 0);
-				*/
 
 				// Привязать VAO
 				glBindVertexArray(part.getGeometry()->getVaoId());
@@ -393,10 +268,8 @@ namespace ogl
 		// Использовать шейдер
 		glUseProgram(shaderID);
 
-		// Обновляем области UBO-буфера содержащие положение камеры
-		glBindBuffer(GL_UNIFORM_BUFFER, uboPositions_);
-		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::vec4), glm::value_ptr(cameraPosition));
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		// Передать положение камеры (для бликов/отражений)
+		glUniform3fv(glGetUniformLocation(shaderID, "cameraPosition"), 1, glm::value_ptr(this->cameraPosition));
 
 		// Отключить тест глубины
 		glDisable(GL_DEPTH_TEST);
@@ -426,8 +299,8 @@ namespace ogl
 		if(!this->lights_.empty())
 		{
 			GLuint pointLights = 0;         // Итератор точечных источников
-			//GLuint directionalLights = 0;   // Итератор направленных источников
-			//GLuint spotLights = 0;          // Итератор фонариков-прожекторов
+			GLuint directionalLights = 0;   // Итератор направленных источников
+			GLuint spotLights = 0;          // Итератор фонариков-прожекторов
 
 			// Пройти по всем источникам
 			for(auto light : this->lights_)
@@ -435,16 +308,31 @@ namespace ogl
 				// Если это точечный источник
 				if(light->getType() == LightType::POINT_LIGHT)
 				{
-					// Создать структуру формата std 140 
-					Std140PointLightSettings settings(light->position,light->color,light->attenuation.linear,light->attenuation.quadratic);
+					// Передать данные источника в шейдер
+					this->lightSettingsToShader(shaderID, light, pointLights);
 
-					// Обновить часть буфера соответствующую этому источнику света
-					glBindBuffer(GL_UNIFORM_BUFFER, uboPointLights_);
-					glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Std140PointLightSettings)*pointLights, sizeof(Std140PointLightSettings), &settings);
-					glBindBuffer(GL_UNIFORM_BUFFER, 0);
-					
-					//Увеличить итератор точечных источников
+					// Увеличить итератор точечных источников
 					pointLights++;
+				}
+
+				// Если это направленный источник
+				if(light->getType() == LightType::DIRECTIONAL_LIGHT)
+				{
+					// Передать данные источника в шейдер
+					this->lightSettingsToShader(shaderID, light, directionalLights);
+
+					// Увеличить итератор направленных источников
+					directionalLights++;
+				}
+
+				// Если это фонарик-прожектор
+				if(light->getType() == LightType::SPOT_LIGHT)
+				{
+					// Передать данные источника в шейдер
+					this->lightSettingsToShader(shaderID, light, spotLights);
+
+					//Увеличить итератор источников типа "фонарик"
+					spotLights++;
 				}
 			}
 		}
@@ -502,6 +390,56 @@ namespace ogl
 	}
 
 	/**
+	* \brief Передать в шейдер структуру маппинга текстуры
+	* \param shaderId ID шейдера
+	* \param mapping Структура маппинга
+	* \param uniformName Наименование uniform переменной
+	*/
+	void Renderer::texMappingToShader(GLuint shaderId, const TextureMapping& mapping, std::string uniformName) const
+	{
+		glUniform2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".offset").c_str()), 1, glm::value_ptr(mapping.offset));
+		glUniform2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".origin").c_str()), 1, glm::value_ptr(mapping.origin));
+		glUniform2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".scale").c_str()), 1, glm::value_ptr(mapping.scale));
+		glUniformMatrix2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".rotation").c_str()), 1, GL_FALSE, glm::value_ptr(mapping.rotation));
+	}
+
+	/**
+	* \brief Передать в шейдер параметры источника света
+	* \param shaderId ID шейдера
+	* \param light Указатель на источник света
+	* \param index Индекс источника в массиве
+	*/
+	void Renderer::lightSettingsToShader(GLuint shaderId, LightPtr light, GLuint index) const
+	{
+		if(light->getType() == LightType::POINT_LIGHT)
+		{
+			std::string varBaseName = "pointLights[" + std::to_string(index) + "].";
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
+		}
+		else if(light->getType() == LightType::DIRECTIONAL_LIGHT)
+		{
+			std::string varBaseName = "directionalLights[" + std::to_string(index) + "].";
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
+		}
+		else if(light->getType() == LightType::SPOT_LIGHT)
+		{
+			std::string varBaseName = "spotLights[" + std::to_string(index) + "].";
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
+			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "cutOffCos").c_str()), glm::cos(glm::radians(light->cutOffAngle)));
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "cutOffOuterCos").c_str()), glm::cos(glm::radians(light->cutOffOuterAngle)));
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
+			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
+			glUniformMatrix4fv(glGetUniformLocation(shaderId, std::string(varBaseName + "modelMatrix").c_str()), 1, GL_FALSE, glm::value_ptr(light->getModelMatrix()));
+		}
+	}
+
+	/**
 	* \brief Конструктор
 	* \param hwnd Хендл WinAPI окна
 	* \param geometry Шейдер для рендеринга геометрии
@@ -512,8 +450,6 @@ namespace ogl
 		hwnd_(hwnd),
 		viewMatrix_(glm::mat4(1)),
 		projectionMatrix_(glm::mat4(1)),
-		uboViewProjection_(0),
-		uboModel_(0),
 		cameraPosition(glm::vec3(0.0f, 0.0f, 0.0f))
 	{
 		// Инициализация GLEW
@@ -592,7 +528,7 @@ namespace ogl
 		// т е к с т у р ы  п о  у м о л ч а н и ю
 
 		GLubyte whitePixel[] = { 255,255,255 }; // белый пиксель
-		GLubyte bluePixel[] = { 127,127,255 };  // синеватый пиксель, соответствует нормали [0,0,1]
+		GLubyte bluePixel[] = { 128,128,255 };  // синеватый пиксель, соответствует нормали [0,0,1]
 		this->defaultTextures_.diffuse = MakeTextureResource(whitePixel, 1, 1, 24, false);
 		this->defaultTextures_.specular = MakeTextureResource(whitePixel, 1, 1, 24, false);
 		this->defaultTextures_.bump = MakeTextureResource(bluePixel, 1, 1, 24, false);
@@ -602,11 +538,6 @@ namespace ogl
 		this->shaders_.shaderGBuffer_ = geometry;
 		this->shaders_.shaderLighting_ = lightning;
 		this->shaders_.shaderPostProcessing_ = postProcessing;
-
-		// u n i f o r m - б у ф е р ы
-
-		// Инициализация uniform-буфера (инициализация возможна только после того как задан шейдер)
-		this->initUniformBuffers();
 	}
 
 	/**
@@ -614,9 +545,6 @@ namespace ogl
 	*/
 	Renderer::~Renderer()
 	{
-		// Уничтожение uniform-буферов
-		this->freeUniformBuffers();
-
 		// Уничтожение G-буфера и фрейм-буфера
 		this->freeGBuffer();
 		this->freeFrameBuffer();
