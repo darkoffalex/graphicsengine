@@ -309,7 +309,11 @@ namespace ogl
 				if(light->getType() == LightType::POINT_LIGHT)
 				{
 					// Передать данные источника в шейдер
-					this->lightSettingsToShader(shaderID, light, pointLights);
+					std::string varBaseName = "pointLights[" + std::to_string(pointLights) + "].";
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
 
 					// Увеличить итератор точечных источников
 					pointLights++;
@@ -319,7 +323,9 @@ namespace ogl
 				if(light->getType() == LightType::DIRECTIONAL_LIGHT)
 				{
 					// Передать данные источника в шейдер
-					this->lightSettingsToShader(shaderID, light, directionalLights);
+					std::string varBaseName = "directionalLights[" + std::to_string(pointLights) + "].";
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
 
 					// Увеличить итератор направленных источников
 					directionalLights++;
@@ -329,7 +335,15 @@ namespace ogl
 				if(light->getType() == LightType::SPOT_LIGHT)
 				{
 					// Передать данные источника в шейдер
-					this->lightSettingsToShader(shaderID, light, spotLights);
+					std::string varBaseName = "spotLights[" + std::to_string(spotLights) + "].";
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
+					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "cutOffCos").c_str()), glm::cos(glm::radians(light->cutOffAngle)));
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "cutOffOuterCos").c_str()), glm::cos(glm::radians(light->cutOffOuterAngle)));
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
+					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
+					glUniformMatrix4fv(glGetUniformLocation(shaderID, std::string(varBaseName + "modelMatrix").c_str()), 1, GL_FALSE, glm::value_ptr(light->getModelMatrix()));
 
 					//Увеличить итератор источников типа "фонарик"
 					spotLights++;
@@ -342,6 +356,57 @@ namespace ogl
 
 		// Отвязать VAO
 		glBindVertexArray(0);
+	}
+
+	/**
+	* \brief Проход для рендеринга системных объектов (напр. источники света)
+	* \param shaderID
+	*/
+	void Renderer::renderPassSysObjects(GLuint shaderID) const
+	{
+		// Установка размеров области вида
+		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
+
+		// Использовать шейдер
+		glUseProgram(shaderID);
+
+		// Скопировать значения глубины из G-буфера во фрейм-буфер (чтобы объекты не рендерелись поверх всего подряд)
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, this->gBuffer_.gBufferId);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+		glBlitFramebuffer(0, 0, this->viewPort.width, this->viewPort.height, 0, 0, this->viewPort.width, this->viewPort.height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+		// Активировать фрейм-буфер (рендеринг во фрейм-буфер)
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+
+		// Включить тест глубины
+		glEnable(GL_DEPTH_TEST);
+
+		// Включить тест трафарета
+		//glEnable(GL_STENCIL_TEST);
+
+		// Передача матриц проекции и вида в шейдер
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
+
+		// Проход по всем источникам освещения для их отображения
+		for (auto light : this->lights_)
+		{
+			// Если источник света должен быть отображен
+			if (light->render)
+			{
+				// Матрица модели
+				glm::mat4 mdodelMatrix = light->getModelMatrix();
+				glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
+
+				// Передать цвет
+				glUniform3fv(glGetUniformLocation(shaderID, "lightColor"), 1, glm::value_ptr(light->color));
+
+				// Привязать VAO
+				glBindVertexArray(this->defaultGeometry_.cube->getVaoId());
+				glDrawElements(GL_TRIANGLES, this->defaultGeometry_.cube->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+				glBindVertexArray(0);
+			}
+		}
 	}
 
 	/**
@@ -401,42 +466,6 @@ namespace ogl
 		glUniform2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".origin").c_str()), 1, glm::value_ptr(mapping.origin));
 		glUniform2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".scale").c_str()), 1, glm::value_ptr(mapping.scale));
 		glUniformMatrix2fv(glGetUniformLocation(shaderId, std::string(uniformName + ".rotation").c_str()), 1, GL_FALSE, glm::value_ptr(mapping.rotation));
-	}
-
-	/**
-	* \brief Передать в шейдер параметры источника света
-	* \param shaderId ID шейдера
-	* \param light Указатель на источник света
-	* \param index Индекс источника в массиве
-	*/
-	void Renderer::lightSettingsToShader(GLuint shaderId, LightPtr light, GLuint index) const
-	{
-		if(light->getType() == LightType::POINT_LIGHT)
-		{
-			std::string varBaseName = "pointLights[" + std::to_string(index) + "].";
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
-		}
-		else if(light->getType() == LightType::DIRECTIONAL_LIGHT)
-		{
-			std::string varBaseName = "directionalLights[" + std::to_string(index) + "].";
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-		}
-		else if(light->getType() == LightType::SPOT_LIGHT)
-		{
-			std::string varBaseName = "spotLights[" + std::to_string(index) + "].";
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
-			glUniform3fv(glGetUniformLocation(shaderId, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "cutOffCos").c_str()), glm::cos(glm::radians(light->cutOffAngle)));
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "cutOffOuterCos").c_str()), glm::cos(glm::radians(light->cutOffOuterAngle)));
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
-			glUniform1f(glGetUniformLocation(shaderId, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
-			glUniformMatrix4fv(glGetUniformLocation(shaderId, std::string(varBaseName + "modelMatrix").c_str()), 1, GL_FALSE, glm::value_ptr(light->getModelMatrix()));
-		}
 	}
 
 	/**
@@ -518,7 +547,7 @@ namespace ogl
 		// г е о м е т р и я  п о  у м о л ч а н и ю
 
 		this->defaultGeometry_.cube = MakeStaticGeometryResource(
-			defaults::GetVertices(defaults::DefaultGeometryType::CUBE, 0.3f),
+			defaults::GetVertices(defaults::DefaultGeometryType::CUBE, 0.1f),
 			defaults::GetIndices(defaults::DefaultGeometryType::CUBE));
 
 		this->defaultGeometry_.quad = MakeStaticGeometryResource(
@@ -538,6 +567,7 @@ namespace ogl
 		this->shaders_.shaderGBuffer_ = geometry;
 		this->shaders_.shaderLighting_ = lightning;
 		this->shaders_.shaderPostProcessing_ = postProcessing;
+		this->shaders_.shaderSolidColor_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SOLID_COLORED));
 	}
 
 	/**
@@ -667,11 +697,14 @@ namespace ogl
 		GLuint geometryShaderID = this->shaders_.shaderGBuffer_->getId();
 		GLuint lightingShaderID = this->shaders_.shaderLighting_->getId();
 		GLuint postProcessingShaderID = this->shaders_.shaderPostProcessing_->getId();
+		GLuint solidColorShaderID = this->shaders_.shaderSolidColor_->getId();
 
 		// Отрендерить кадр с геометрией, записать значения положений, нормалей, цветов фрагментов в G-буфер
 		this->renderPassGeometry(geometryShaderID, { 0.0f,0.0f,0.0f,0.0f }, clearMask);
 		// Используя данные из G-буфера произвести расчет освещенности (запись во фрейм-буфер)
 		this->renderPassLighting(lightingShaderID, this->cameraPosition, clearColor, GL_COLOR_BUFFER_BIT);
+		// Отрендерить системные объекты (при необходимости)
+		this->renderPassSysObjects(solidColorShaderID);
 		// Осуществить пост-обработку полученного кадра, на основе цветового вложения фрейм-буфера (запись в основной буфер)
 		this->renderPassFinal(postProcessingShaderID, clearColor, GL_COLOR_BUFFER_BIT);
 	}

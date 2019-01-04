@@ -65,6 +65,7 @@ namespace ogl
 			ShaderResourcePtr shaderGBuffer_;
 			ShaderResourcePtr shaderLighting_;
 			ShaderResourcePtr shaderPostProcessing_;
+			ShaderResourcePtr shaderSolidColor_;
 		} shaders_;
 
 		// Г Е О М Е Т Р И Я  П О  У М О Л Ч А Н И Ю
@@ -151,6 +152,12 @@ namespace ogl
 		void renderPassLighting(GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const;
 
 		/**
+		 * \brief Проход для рендеринга системных объектов (напр. источники света)
+		 * \param shaderID 
+		 */
+		void renderPassSysObjects(GLuint shaderID) const;
+
+		/**
 		 * \brief Проход рендеринга для финального представления (рендеринг в основной буфер)
 		 * \param shaderID шейдер для рендеринга во фрейм-буфер
 		 * \param clearColor Цвет очистки
@@ -166,13 +173,6 @@ namespace ogl
 		 */
 		void texMappingToShader(GLuint shaderId, const TextureMapping& mapping, std::string uniformName) const;
 		
-		/**
-		 * \brief Передать в шейдер параметры источника света
-		 * \param shaderId ID шейдера
-		 * \param light Указатель на источник света
-		 * \param index Индекс источника в массиве
-		 */
-		void lightSettingsToShader(GLuint shaderId, LightPtr light, GLuint index) const;
 	public:
 		/**
 		 * \brief Ширина и высота области вида
