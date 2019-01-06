@@ -35,6 +35,7 @@
     <ClCompile Include="RendererOgl\Tools.cpp" />
     <ClCompile Include="RendererOgl\Types.cpp" />
     <ClCompile Include="Tools\FileTools.cpp" />
+    <ClCompile Include="Tools\ObjLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CameraBase.h" />
@@ -52,6 +53,7 @@
     <ClInclude Include="RendererOgl\Tools.h" />
     <ClInclude Include="RendererOgl\Types.h" />
     <ClInclude Include="Tools\FileTools.h" />
+    <ClInclude Include="Tools\ObjLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Shaders\geometry.glsl" />

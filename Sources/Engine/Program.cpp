@@ -12,6 +12,7 @@
 #include "CameraControllable.h"
 #include "Controls.h"
 #include "Tools/FileTools.h"
+#include "Tools/ObjLoader.h"
 #include "RendererOgl/Defaults.h"
 
 
@@ -45,6 +46,10 @@ struct{
 		ogl::TextureResourcePtr wallDiffuse;
 		ogl::TextureResourcePtr wallSpecular;
 		ogl::TextureResourcePtr wallBump;
+
+		ogl::TextureResourcePtr headDiffuse;
+		ogl::TextureResourcePtr headSpecular;
+		ogl::TextureResourcePtr headBump;
 	} textures;
 
 	// Геометрия
@@ -52,6 +57,7 @@ struct{
 		ogl::StaticGeometryResourcePtr ground;
 		ogl::StaticGeometryResourcePtr wall;
 		ogl::StaticGeometryResourcePtr cube;
+		ogl::StaticGeometryResourcePtr head;
 	} geometry;
 } _sceneResources;
 
@@ -226,6 +232,8 @@ void Load()
 
 	// Г Е О М Е Т Р И Я
 
+
+
 	// Геометрия используемая для пола
 	_sceneResources.geometry.ground = ogl::MakeStaticGeometryResource({
 		{ { 10.0f, 0.0f, -10.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
@@ -248,6 +256,12 @@ void Load()
 		{ { -5.0f, 5.0f,  0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
 	}, { 0,1,2, 0,2,3 }, false, true, false);
 
+	// Геометрия башки негра
+	ObjLoader loader;
+	loader.LoadFromFile(ExeDir().append("..\\Models\\head\\african_head.obj"));
+	_sceneResources.geometry.head = loader.MakeOglRendererResource(true);
+	loader.Clear();
+
 	// Т Е К С Т У Р Ы
 
 	int width, height, bpp;
@@ -266,6 +280,20 @@ void Load()
 
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall_normal.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	stbi_image_free(textureBytes);
+
+	// Текстуры башки негра
+	stbi_set_flip_vertically_on_load(true);
+	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_diffuse.tga").c_str(), &width, &height, &bpp, 3);
+	_sceneResources.textures.headDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	stbi_image_free(textureBytes);
+
+	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_spec.tga").c_str(), &width, &height, &bpp, 3);
+	_sceneResources.textures.headSpecular = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	stbi_image_free(textureBytes);
+
+	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_bump.tga").c_str(), &width, &height, &bpp, 3);
+	_sceneResources.textures.headBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 }
 
@@ -292,12 +320,19 @@ void Init(ogl::Renderer* pRenderer)
 
 	// Добавить к отрисовке куб
 	ogl::StaticMeshPtr cube = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube->getParts()[0].material = ogl::defaults::GetMaterialSetings(ogl::defaults::DefaultMaterialType::DEFAULT);
 	cube->position = { 0.0f,-0.75f,-1.0f };
 	cube->scale = { 0.5f,0.5f,0.5f };
 
+	// Добавить к отрисовке башку негра
+	ogl::StaticMeshPtr head = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.head)));
+	head->getParts()[0].diffuseTexture.resource = _sceneResources.textures.headDiffuse;
+	head->getParts()[0].specularTexture.resource = _sceneResources.textures.headSpecular;
+	head->getParts()[0].bumpTexture.resource = _sceneResources.textures.headBump;
+	head->position = { 0.0f,-0.35f,-1.0f };
+	head->scale = { 0.3f,0.3f,0.3f };
+
 	// Добавить источники света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.0f,0.0f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.5f,0.5f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
 	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
 }

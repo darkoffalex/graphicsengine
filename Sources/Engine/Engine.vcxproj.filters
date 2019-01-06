@@ -78,6 +78,9 @@
     <ClCompile Include="RendererOgl\TextureCubicResource.cpp">
       <Filter>Файлы исходного кода\RendererOgl</Filter>
     </ClCompile>
+    <ClCompile Include="Tools\ObjLoader.cpp">
+      <Filter>Файлы исходного кода\Tools</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tools\FileTools.h">
@@ -124,6 +127,9 @@
     </ClInclude>
     <ClInclude Include="RendererOgl\TextureCubicResource.h">
       <Filter>Заголовочные файлы\RendererOgl</Filter>
+    </ClInclude>
+    <ClInclude Include="Tools\ObjLoader.h">
+      <Filter>Заголовочные файлы\Tools</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
