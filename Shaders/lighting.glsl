@@ -26,13 +26,13 @@ void main()
 /*FRAGMENT-SHADER-BEGIN*/
 #version 330 core
 
-// Максимальные кол-во источников разных типов
-#define MAX_POINT_LIGHTS 32
-#define MAX_DIRECT_LIGHTS 32
-#define MAX_SPOT_LIGHTS 32
-
 // Выход шейдера
 layout (location = 0) out vec4 color;
+
+// Типы источника освещения
+#define LIGHT_POINT 1
+#define LIGHT_DIRECTIONAL 2
+#define LIGHT_SPOT 3
 
 // Структура описывающая параметры материала
 struct MaterialSettings
@@ -52,25 +52,10 @@ struct FragmentSettings
 	float specularity;
 };
 
-// Структура описывающая параметры точечного источника освещения
-struct PointLight
+// Структура описывающая параметры источника света
+struct Light
 {
-	vec3 position;
-	vec3 color;
-	float linear;
-	float quadratic;
-};
-
-// Структура описывающая параметры направленного источника освещения
-struct DirectLight
-{
-	vec3 direction;
-	vec3 color;
-};
-
-// Структура описывающая параметры источника типа "прожектор-фонарик"
-struct SpotLight
-{
+	uint type;
 	vec3 position;
 	vec3 color;
 	vec3 direction;
@@ -90,18 +75,16 @@ in VS_OUT
 // Uniform-переменная для положения камеры
 uniform vec3 cameraPosition;
 
-// Uniform-переменные для источников света
-uniform PointLight pointLights[MAX_POINT_LIGHTS];
-uniform DirectLight directionalLights[MAX_DIRECT_LIGHTS];
-uniform SpotLight spotLights[MAX_SPOT_LIGHTS];
+// Uniform-переменные для источника света
+uniform Light light;
 
-// Текстуры
+// Текстуры из G-буфера
 uniform sampler2D albedoSpecularTexture;
 uniform sampler2D positionTexture;
 uniform sampler2D normalTexture;
 
 // Вычислить освещенность фрагмента точечным источником
-vec3 calculatePointLightComponent(PointLight light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
+vec3 calculatePointLightComponent(Light light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
 {
 	// Вектор из фрагмента в камеру (обратное направление взгляда)
 	vec3 fragmentToView = normalize(viewPosition - fragment.position);
@@ -128,7 +111,7 @@ vec3 calculatePointLightComponent(PointLight light, FragmentSettings fragment, M
 }
 
 // Вычислить освещенность фрагмента направленным источником
-vec3 calculateDirectLightComponent(DirectLight light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
+vec3 calculateDirectLightComponent(Light light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
 {
 	// Вектор из фрагмента в камеру (обратное направление взгляда)
 	vec3 fragmentToView = normalize(viewPosition - fragment.position);
@@ -151,7 +134,7 @@ vec3 calculateDirectLightComponent(DirectLight light, FragmentSettings fragment,
 }
 
 // Вычислить освещенность фрагмента фонариком-прожектором
-vec3 calculateSpotLightComponent(SpotLight light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
+vec3 calculateSpotLightComponent(Light light, FragmentSettings fragment, MaterialSettings material, vec3 viewPosition)
 {
 	// Вектор из фрагмента в камеру (обратное направление взгляда)
 	vec3 fragmentToView = normalize(viewPosition - fragment.position);
@@ -209,22 +192,23 @@ void main()
 	// Результирующий цвет
 	vec3 resultColor;
 
-	// Пройтись по массиву точечных источников света
-	for(int i = 0; i < MAX_POINT_LIGHTS; i++){
-		resultColor += calculatePointLightComponent(pointLights[i], fragment, material, cameraPosition);
+	// В зависимости от типа источника
+	switch(light.type)
+	{
+		case uint(LIGHT_POINT):
+		resultColor = calculatePointLightComponent(light, fragment, material, cameraPosition);
+		break;
+
+		case uint(LIGHT_DIRECTIONAL):
+		resultColor = calculateDirectLightComponent(light, fragment, material, cameraPosition);
+		break;
+
+		case uint(LIGHT_SPOT):
+		resultColor = calculateSpotLightComponent(light, fragment, material, cameraPosition);
+		break;
 	}
 
-	// Пройтись по массиву направленных источников
-	for(int i = 0; i < MAX_DIRECT_LIGHTS; i++){
-		resultColor += calculateDirectLightComponent(directionalLights[i], fragment, material, cameraPosition);
-	}
-
-	// Пройтись по массиву прожекторов-фонариков
-	for(int i = 0; i < MAX_SPOT_LIGHTS; i++){
-		resultColor += calculateSpotLightComponent(spotLights[i], fragment, material, cameraPosition);
-	}
-
-	// Итоговый цвет
+	// Итоговый цвет + альфа
 	color = vec4(resultColor,1.0f);
 }
 

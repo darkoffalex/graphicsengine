@@ -247,13 +247,16 @@ namespace ogl
 	}
 
 	/**
-	* \brief Проход для рендеринга освещенности (рендеринг во фрейм-буфер)
-	* \param shaderID шейдер для рендеринга во фрейм-буфер
+	* \brief Проход рендеринга освещенности (один источником света)
+	* \details Данный метод вызывается многократно (для нескольких источников), результаты буфера суммируются
+	* \param light Источник света
+	* \param shaderID Шейдер для рендеринга освещения
 	* \param cameraPosition Положение камеры
 	* \param clearColor Цвет очистки
 	* \param clearMask Маска очистки
+	* \param clear Очистить
 	*/
-	void Renderer::renderPassLighting(GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const
+	void Renderer::renderPassLighting(LightPtr light, GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask, bool clear) const
 	{
 		// Установка размеров области вида
 		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
@@ -261,9 +264,21 @@ namespace ogl
 		// Активировать фрейм-буфер (рендеринг во фрейм-буфер)
 		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
 
-		// Установка параметров очистки экрана
-		glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
-		glClear(clearMask);
+		// Включть аддтимвное смешивание (предыдущй цвет складывается с текущим)
+		glEnable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_ONE, GL_ONE);
+
+		// Если нужно очистить буфер
+		// Поскольку данный проход выполняется для каждого источника с последующим аддиивным смешиванием, буффер следует очищать только в первый раз
+		if(clear)
+		{
+			// Установка параметров очистки экрана
+			glClearColor(clearColor.r, clearColor.g, clearColor.b, clearColor.a);
+			// Очистить экран
+			glClear(clearMask);
+		}
+
 
 		// Использовать шейдер
 		glUseProgram(shaderID);
@@ -295,60 +310,35 @@ namespace ogl
 		glBindTexture(GL_TEXTURE_2D, this->gBuffer_.gNormalAttachmentId);
 		glUniform1i(glGetUniformLocation(shaderID, "normalTexture"), 2);
 
-		// Если не пуст массив источников света
-		if(!this->lights_.empty())
+		// Передать в шейдер тип источника освещения
+		glUniform1ui(glGetUniformLocation(shaderID, "light.type"), static_cast<GLuint>(light->getType()));
+
+		// Передать параметры источника освещения в шейдер (в зависимости от типа)
+		switch (light->getType())
 		{
-			GLuint pointLights = 0;         // Итератор точечных источников
-			GLuint directionalLights = 0;   // Итератор направленных источников
-			GLuint spotLights = 0;          // Итератор фонариков-прожекторов
+		case LightType::POINT_LIGHT:
+		default:
+			glUniform3fv(glGetUniformLocation(shaderID, "light.position"), 1, glm::value_ptr(light->position));
+			glUniform3fv(glGetUniformLocation(shaderID, "light.color"), 1, glm::value_ptr(light->color));
+			glUniform1f(glGetUniformLocation(shaderID, "light.linear"), light->attenuation.linear);
+			glUniform1f(glGetUniformLocation(shaderID, "light.quadratic"), light->attenuation.quadratic);
+			break;
 
-			// Пройти по всем источникам
-			for(auto light : this->lights_)
-			{
-				// Если это точечный источник
-				if(light->getType() == LightType::POINT_LIGHT)
-				{
-					// Передать данные источника в шейдер
-					std::string varBaseName = "pointLights[" + std::to_string(pointLights) + "].";
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
+		case LightType::DIRECTIONAL_LIGHT:
+			glUniform3fv(glGetUniformLocation(shaderID, "light.direction"), 1, glm::value_ptr(light->getDirection()));
+			glUniform3fv(glGetUniformLocation(shaderID, "light.color"), 1, glm::value_ptr(light->color));
+			break;
 
-					// Увеличить итератор точечных источников
-					pointLights++;
-				}
-
-				// Если это направленный источник
-				if(light->getType() == LightType::DIRECTIONAL_LIGHT)
-				{
-					// Передать данные источника в шейдер
-					std::string varBaseName = "directionalLights[" + std::to_string(pointLights) + "].";
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-
-					// Увеличить итератор направленных источников
-					directionalLights++;
-				}
-
-				// Если это фонарик-прожектор
-				if(light->getType() == LightType::SPOT_LIGHT)
-				{
-					// Передать данные источника в шейдер
-					std::string varBaseName = "spotLights[" + std::to_string(spotLights) + "].";
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "position").c_str()), 1, glm::value_ptr(light->position));
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "direction").c_str()), 1, glm::value_ptr(light->getDirection()));
-					glUniform3fv(glGetUniformLocation(shaderID, std::string(varBaseName + "color").c_str()), 1, glm::value_ptr(light->color));
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "cutOffCos").c_str()), glm::cos(glm::radians(light->cutOffAngle)));
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "cutOffOuterCos").c_str()), glm::cos(glm::radians(light->cutOffOuterAngle)));
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "linear").c_str()), light->attenuation.linear);
-					glUniform1f(glGetUniformLocation(shaderID, std::string(varBaseName + "quadratic").c_str()), light->attenuation.quadratic);
-					glUniformMatrix4fv(glGetUniformLocation(shaderID, std::string(varBaseName + "modelMatrix").c_str()), 1, GL_FALSE, glm::value_ptr(light->getModelMatrix()));
-
-					//Увеличить итератор источников типа "фонарик"
-					spotLights++;
-				}
-			}
+		case LightType::SPOT_LIGHT:
+			glUniform3fv(glGetUniformLocation(shaderID, "light.position"), 1, glm::value_ptr(light->position));
+			glUniform3fv(glGetUniformLocation(shaderID, "light.direction"), 1, glm::value_ptr(light->getDirection()));
+			glUniform3fv(glGetUniformLocation(shaderID, "light.color"), 1, glm::value_ptr(light->color));
+			glUniform1f(glGetUniformLocation(shaderID, "light.cutOffCos"), glm::cos(glm::radians(light->cutOffAngle)));
+			glUniform1f(glGetUniformLocation(shaderID, "light.cutOffOuterCos"), glm::cos(glm::radians(light->cutOffOuterAngle)));
+			glUniform1f(glGetUniformLocation(shaderID, "light.linear"), light->attenuation.linear);
+			glUniform1f(glGetUniformLocation(shaderID, "light.quadratic"), light->attenuation.quadratic);
+			glUniformMatrix4fv(glGetUniformLocation(shaderID, "light.modelMatrix"), 1, GL_FALSE, glm::value_ptr(light->getModelMatrix()));
+			break;
 		}
 
 		// Отрисовать VAO
@@ -356,6 +346,9 @@ namespace ogl
 
 		// Отвязать VAO
 		glBindVertexArray(0);
+
+		// Отключить смешивание
+		glDisable(GL_BLEND);
 	}
 
 	/**
@@ -701,8 +694,24 @@ namespace ogl
 
 		// Отрендерить кадр с геометрией, записать значения положений, нормалей, цветов фрагментов в G-буфер
 		this->renderPassGeometry(geometryShaderID, { 0.0f,0.0f,0.0f,0.0f }, clearMask);
-		// Используя данные из G-буфера произвести расчет освещенности (запись во фрейм-буфер)
-		this->renderPassLighting(lightingShaderID, this->cameraPosition, clearColor, GL_COLOR_BUFFER_BIT);
+
+		// Пройти по всем источникам
+		for(unsigned int i = 0; i < this->lights_.size(); i++)
+		{
+			// Если источник установлен и валиден
+			if (this->lights_[i] != nullptr){
+				// Посчитать освещенность для источника, наложить на имеющийся в фрейм-буфере
+				this->renderPassLighting(
+					this->lights_[i],     // Источник
+					lightingShaderID,     // Шейдер
+					this->cameraPosition, // Положение камеры
+					clearColor,           // Цвет очистки
+					GL_COLOR_BUFFER_BIT,  // Очищать цветовой буфер
+					i == 0                // Очищать только первый раз
+				);
+			}
+		}
+
 		// Отрендерить системные объекты (при необходимости)
 		this->renderPassSysObjects(solidColorShaderID);
 		// Осуществить пост-обработку полученного кадра, на основе цветового вложения фрейм-буфера (запись в основной буфер)

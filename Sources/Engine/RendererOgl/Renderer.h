@@ -143,13 +143,16 @@ namespace ogl
 		void renderPassGeometry(GLuint shaderID, glm::vec4 clearColor, GLbitfield clearMask);
 
 		/**
-		 * \brief Проход для рендеринга освещенности (рендеринг во фрейм-буфер)
-		 * \param shaderID шейдер для рендеринга во фрейм-буфер
+		 * \brief Проход рендеринга освещенности (один источником света)
+		 * \details Данный метод вызывается многократно (для нескольких источников), результаты буфера суммируются
+		 * \param light Источник света
+		 * \param shaderID Шейдер для рендеринга освещения
 		 * \param cameraPosition Положение камеры
 		 * \param clearColor Цвет очистки
 		 * \param clearMask Маска очистки
+		 * \param clear Очистить
 		 */
-		void renderPassLighting(GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask) const;
+		void renderPassLighting(LightPtr light, GLuint shaderID, const glm::vec3& cameraPosition, glm::vec4 clearColor, GLbitfield clearMask, bool clear = false) const;
 
 		/**
 		 * \brief Проход для рендеринга системных объектов (напр. источники света)
