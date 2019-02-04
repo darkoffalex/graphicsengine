@@ -232,8 +232,6 @@ void Load()
 
 	// Г Е О М Е Т Р И Я
 
-
-
 	// Геометрия используемая для пола
 	_sceneResources.geometry.ground = ogl::MakeStaticGeometryResource({
 		{ { 10.0f, 0.0f, -10.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,1.0f } },
@@ -259,7 +257,7 @@ void Load()
 	// Геометрия башки негра
 	ObjLoader loader;
 	loader.LoadFromFile(ExeDir().append("..\\Models\\head\\african_head.obj"));
-	_sceneResources.geometry.head = loader.MakeOglRendererResource(true);
+	_sceneResources.geometry.head = loader.MakeOglRendererResource(true, true);
 	loader.Clear();
 
 	// Т Е К С Т У Р Ы

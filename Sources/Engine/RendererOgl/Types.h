@@ -2,6 +2,7 @@
 
 #include <gl/glew.h>
 #include <glm/glm.hpp>
+#include <vector>
 
 namespace ogl
 {
@@ -18,35 +19,51 @@ namespace ogl
 	};
 
 	/**
-	 * \brief Полигон. Используется в основном для вычисления нормалей
-	 * \details Полезен при формировании буфера геометрии (для вычисления нормалей и тенгентов)
-	 */
+	* \brief Полигон
+	* \details Хранит в себе 3 вершины, может счиать нормали и тангенты
+	*/
 	struct Polygon
 	{
-		glm::vec3 vertices[3];
-		GLuint indices[3];
-		glm::vec2 uvs[3];
+		std::vector<Vertex> vertices;
 
 		/**
-		 * \brief Вычисление нормали
-		 * \param ccw Треугольник построен по часовой и против часовой стрелки
-		 * \return Вектор нормали
-		 */
-		glm::vec3 getNormal(bool ccw = false) const;
+		* \brief Подсчет нормали
+		* \param ccw Обход вершин против часовой стрелки
+		* \return Нормаль
+		*/
+		glm::vec3 calculateNormal(bool ccw = false);
 
 		/**
-		 * \brief Вычисление тангента
-		 * \return Вектор тангента
-		 * \details Полученный вектор зависит от UV координат и ориентации текстуры на полигоне
-		 */
-		glm::vec3 getUVTangent() const;
+		* \brief Подсчет тангента
+		* \details Для подсчета должны быть заданы корректный UV координаты
+		* \return Тангент
+		*/
+		glm::vec3 calculateUVTangent();
+	};
+
+	/**
+	* \brief Полигон (индексированный)
+	* \detais Не хранит фактических данных вершин, но хранит индексы каждой
+	*/
+	struct PolygonIndexed
+	{
+		std::vector<glm::uint32> indices;
 
 		/**
-		 * \brief Есть ли такой индекс у полигона
-		 * \param index Индекс
-		 * \return Да или нет
-		 */
-		bool hasIndex(GLuint index) const;
+		* \brief Подсчет нормали
+		* \param vertices Ссылка на массив вершин
+		* \param ccw Обход вершин против часовой стрелки
+		* \return Нормаль
+		*/
+		glm::vec3 calculateNormal(const std::vector<Vertex>& vertices, bool ccw = false);
+
+		/**
+		* \brief Подсчет тангента
+		* \details Для подсчета должны быть заданы корректный UV координаты
+		* \param vertices Ссылка на массив вершин
+		* \return Тангент
+		*/
+		glm::vec3 calculateUVTangent(const std::vector<Vertex>& vertices);
 	};
 
 	/**

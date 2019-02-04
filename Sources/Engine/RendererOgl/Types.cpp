@@ -3,31 +3,31 @@
 namespace ogl
 {
 	/**
-	* \brief Вычисление нормали
-	* \param ccw Треугольник построен по часовой и против часовой стрелки
-	* \return Вектор нормали
+	* \brief Подсчет нормали
+	* \param ccw Обход вершин против часовой стрелки
+	* \return Нормаль
 	*/
-	glm::vec3 Polygon::getNormal(bool ccw) const
+	glm::vec3 Polygon::calculateNormal(bool ccw)
 	{
-		glm::vec3 edge1 = vertices[1] - vertices[0];
-		glm::vec3 edge2 = vertices[2] - vertices[0];
-		return glm::normalize(ccw ? glm::cross(edge1, edge1) : glm::cross(edge2, edge1));
+		glm::vec3 edge1 = vertices[1].position - vertices[0].position;
+		glm::vec3 edge2 = vertices[2].position - vertices[0].position;
+		return glm::normalize(ccw ? glm::cross(edge1, edge2) : glm::cross(edge2, edge1));
 	}
 
 	/**
-	* \brief Вычисление тангента
-	* \return Вектор тангента
-	* \details Полученный вектор зависит от UV координат и ориентации текстуры на полигоне
+	* \brief Подсчет тангента
+	* \details Для подсчета должны быть заданы корректный UV координаты
+	* \return Тангент
 	*/
-	glm::vec3 Polygon::getUVTangent() const
+	glm::vec3 Polygon::calculateUVTangent()
 	{
 		// Грани полигона (в виде векторов)
-		glm::vec3 edge1 = vertices[1] - vertices[0];
-		glm::vec3 edge2 = vertices[2] - vertices[0];
+		glm::vec3 edge1 = vertices[1].position - vertices[0].position;
+		glm::vec3 edge2 = vertices[2].position - vertices[0].position;
 
 		// Дельта UV для каждой грани
-		glm::vec2 deltaUV1 = uvs[1] - uvs[0];
-		glm::vec2 deltaUV2 = uvs[2] - uvs[0];
+		glm::vec2 deltaUV1 = vertices[1].uv - vertices[0].uv;
+		glm::vec2 deltaUV2 = vertices[2].uv - vertices[0].uv;
 
 		// Подсчет тангента
 		float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
@@ -39,12 +39,40 @@ namespace ogl
 	}
 
 	/**
-	* \brief Есть ли такой индекс у полигона
-	* \param index Индекс
-	* \return Да или нет
+	* \brief Подсчет нормали
+	* \param vertices Ссылка на массив вершин
+	* \param ccw Обход вершин против часовой стрелки
+	* \return Нормаль
 	*/
-	bool Polygon::hasIndex(GLuint index) const
+	glm::vec3 PolygonIndexed::calculateNormal(const std::vector<Vertex>& vertices, bool ccw)
 	{
-		return indices[0] == index || indices[1] == index || indices[2] == index;
+		//TODO: Оптимизировать. Не слишком оптимальное решение (излишнее копирование)
+
+		Polygon p;
+
+		for (auto index : this->indices) {
+			p.vertices.push_back(vertices[index]);
+		}
+
+		return p.calculateNormal(ccw);
+	}
+
+	/**
+	* \brief Подсчет тангента
+	* \details Для подсчета должны быть заданы корректный UV координаты
+	* \param vertices Ссылка на массив вершин
+	* \return Тангент
+	*/
+	glm::vec3 PolygonIndexed::calculateUVTangent(const std::vector<Vertex>& vertices)
+	{
+		//TODO: Оптимизировать. Не слишком оптимальное решение (излишнее копирование)
+
+		Polygon p;
+
+		for (auto index : this->indices) {
+			p.vertices.push_back(vertices[index]);
+		}
+
+		return p.calculateUVTangent();
 	}
 }

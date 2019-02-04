@@ -42,12 +42,21 @@ namespace ogl
 		void StaticGeometryResource::operator=(const StaticGeometryResource& other) = delete;
 
 		/**
-		 * \brief Вычисление нормалей и тангентов для хранимой (или временно-хранимой) геометрии
-		 * \param calcNormals Вычислить норамали для каждой вершины (усредненные нормали смежных полигонов)
-		 * \param calcTangents Вычислить тангенты для каждой вершины (косательные к полигонам, завсящие от UV вектора)
+		 * \brief Пересчитать нормали и тенгенты вершин индексированной геометрии
+		 * \param vertices Указатель на массив вершин
+		 * \param indices Индексы
+		 * \param calcTangents Считать так же и тангенты
+		 * \param ccw Обход вершин против часовой стрелки
 		 */
-		void calculateAdditionalVectorsForStored(bool calcNormals, bool calcTangents);
+		static void recalcNormalsForIndexed(std::vector<Vertex>* vertices, const std::vector<glm::uint32>& indices, bool calcTangents = false, bool ccw = false);
 
+		/**
+		 * \brief Пересчитать нормали и тангенты вершин не индексированной геометрии
+		 * \param vertices Вершины
+		 * \param calcTangents Тангенты
+		 * \param ccw Обход вершин против часовой стрелки
+		 */
+		static void recalcNormalsForNonIndexed(std::vector<Vertex>* vertices, bool calcTangents = false, bool ccw = false);
 	public:
 
 		/**

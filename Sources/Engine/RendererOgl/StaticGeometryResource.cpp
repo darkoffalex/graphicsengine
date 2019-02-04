@@ -1,4 +1,5 @@
 ﻿#include "StaticGeometryResource.h"
+#include <map>
 
 namespace ogl
 {
@@ -8,129 +9,116 @@ namespace ogl
 	extern bool _isGlewInitialised;
 
 	/**
-	* \brief Вычисление нормалей и тангентов для хранимой (или временно-хранимой) геометрии
-	* \param calcNormals Вычислить норамали для каждой вершины (усредненные нормали смежных полигонов)
-	* \param calcTangents Вычислить тангенты для каждой вершины (косательные к полигонам, завсящие от UV вектора)
+	* \brief Пересчитать нормали и тенгенты вершин
+	* \param vertices Указатель на массив вершин
+	* \param indices Индексы
+	* \param calcTangents Считать так же и тангенты
+	* \param ccw Обход вершин против часовой стрелки
 	*/
-	void StaticGeometryResource::calculateAdditionalVectorsForStored(bool calcNormals, bool calcTangents)
+	void StaticGeometryResource::recalcNormalsForIndexed(std::vector<Vertex>* vertices, const std::vector<glm::uint32>& indices, bool calcTangents, bool ccw)
 	{
-		// Если не нужно ничего вычислять - выходим из функции
-		if(!calcNormals && !calcTangents) return;
+		// Ассоциативный массив
+		// Каждый индекс будет связан со всеми полигонами в которых он участвует
+		std::map<glm::uint32, std::vector<PolygonIndexed>> polygons;
 
-		// Если геометрия индексирована
-		if (indexed_)
+		// Временный полигон
+		PolygonIndexed polygon;
+
+		// Пройтись по всем индексам
+		// Для формирования массива связи каждой вершины и полигонов образованных ею
+		// Т.е выясняем в каких полигонах участвует вершина с конкретным индексом
+		for (unsigned int i = 0; i < indices.size(); i++)
 		{
-			// Массив полигонов
-			std::vector<Polygon> polygons;
+			// Заполнять полигон
+			polygon.indices.push_back(indices[i]);
 
-			// Полигон и счет индексов
-			Polygon poly = {};
-			auto count = 0;
+			// Когда 3 вершины были внесены (полигон построен)
+			if ((i + 1) % 3 == 0) {
 
-			// Пройтись по всем индексам и заполнить массив полигонов
-			for (auto index : this->storedIndices_) {
-				
-				// Добавляем индекс
-				poly.indices[count] = index;
-
-				// Положение
-				poly.vertices[count] = glm::vec3(
-					this->storedVertices_[index].position.x, 
-					this->storedVertices_[index].position.y, 
-					this->storedVertices_[index].position.z);
-
-				// Поскольку тангенты нужны для normal-mapping'а
-				// используем UV координаты именно bump текстуры
-				poly.uvs[count] = glm::vec2(
-					this->storedVertices_[index].uv.x, 
-					this->storedVertices_[index].uv.y);
-
-				// Увеличить счетчик
-				count++;
-
-				// Если 3-ий индекс был добавлен, добавить заполненный полигон и сбросить счет
-				if (count > 2) {
-					polygons.push_back(poly);
-					count = 0;
-					poly = {};
-				}
-			}
-
-			// Еще раз пройтись по всем индексам, чтобы найти в каких полигонах участвует вершина с конкретным индексом
-			for (auto index : this->storedIndices_) {
-
-				// Сумма нормалей всех полигонов в которых участвует вершина
-				glm::vec3 normalSum(0.0f, 0.0f, 0.0f);
-
-				// Сумма тангентов всех полигонов в которых участвует вершина
-				glm::vec3 tangentSum(0.0f, 0.0f, 0.0f);
-
-				// Пройтись по полигонам и сложить их нормали и тангенты
-				for (auto polygonEntry : polygons) {
-					if (polygonEntry.hasIndex(index))
+				// Пройтись по этим вершинам (их индексам)
+				for (auto index : polygon.indices)
+				{
+					// Если в ассоциативном массие нету такого ключа, добавить
+					// новый массив содержащий текущий полигон (по данному ключу)
+					if (polygons.find(index) == polygons.end())
 					{
-						glm::vec3 n = calcNormals ? polygonEntry.getNormal() : glm::vec3(0.0f, 0.0f, 0.0f);
-						glm::vec3 t = calcTangents ? polygonEntry.getUVTangent() : glm::vec3(0.0f, 0.0f, 0.0f);
-						normalSum += n;
-						tangentSum += t;
+						polygons[index] = { polygon };
+					}
+					// Если в ассоциативном массие есть такой ключ, добавить
+					// в массив под этим ключом текущий полигон
+					else
+					{
+						polygons[index].push_back(polygon);
 					}
 				}
 
-				// Добавить нормаль вершине
-				if(calcNormals){
-					glm::vec3 normal = glm::normalize(normalSum);
-					this->storedVertices_[index].normal = { normal.x,normal.y,normal.z };
-				}
-
-				// Добавить тангент к вершине
-				if(calcTangents){
-					glm::vec3 tangent = glm::normalize(tangentSum);
-					this->storedVertices_[index].tangent = { tangent.x, tangent.y, tangent.z };
-				}
+				// Cбросить полигон
+				polygon.indices.clear();
 			}
 		}
-		// Если геометрия не индексирована
-		else
+
+		// Пройтись по ассоциативному массиву индексов для подсчета
+		// нормалей и тангентов
+		std::map<glm::uint32, std::vector<PolygonIndexed>>::iterator it;
+		for (it = polygons.begin(); it != polygons.end(); ++it)
 		{
-			// Полигон и счет индексов
-			Polygon poly = {};
-			auto count = 0;
+			// Сумма нормалей всех полигонов
+			glm::vec3 normalSum(0.0f, 0.0f, 0.0f);
+			// Сумма тангентов всех полигонов
+			glm::vec3 tangentSum(0.0f, 0.0f, 0.0f);
+			// Индекс вершины
+			glm::uint32 index = it->first;
 
-			// Пройтись по всем вершинам и на каждом полигоне посчитать нормали и тангеты для каждой вершины
-			for (unsigned int i = 0; i < this->storedVertices_.size(); i++)
+			// Пройтись по всем полигонам в которых участвует проверяемая вершина
+			for (auto poly : it->second)
 			{
-				// Индекс
-				poly.indices[count] = i;
+				normalSum += poly.calculateNormal(*vertices, ccw);
+				if (calcTangents) tangentSum += poly.calculateUVTangent(*vertices);
+			}
 
-				// Положение
-				poly.vertices[count] = glm::vec3(
-					this->storedVertices_[i].position.x, 
-					this->storedVertices_[i].position.y, 
-					this->storedVertices_[i].position.z);
+			// Установить новое значение нормали и тангента
+			(*vertices)[index].normal = glm::normalize(normalSum);
+			(*vertices)[index].tangent = glm::normalize(tangentSum);
+		}
+	}
 
-				// UV координаты
-				poly.uvs[count] = glm::vec2(
-					this->storedVertices_[i].uv.x, 
-					this->storedVertices_[i].uv.y);
+	/**
+	* \brief Пересчитать нормали и тангенты вершин не индексированной геометрии
+	* \param vertices Вершины
+	* \param calcTangents Тангенты
+	* \param ccw Обход вершин против часовой стрелки
+	*/
+	void StaticGeometryResource::recalcNormalsForNonIndexed(std::vector<Vertex>* vertices, bool calcTangents, bool ccw)
+	{
+		// Временный полигон
+		Polygon polygon;
+		PolygonIndexed polygonIndexed;
 
-				// Увеличить счетчик
-				count++;
+		// Пройтись по всем индексам
+		// Для формирования массива связи каждой вершины и полигонов образованных ею
+		// Т.е выясняем в каких полигонах участвует вершина с конкретным индексом
+		for (unsigned int i = 0; i < vertices->size(); i++)
+		{
+			// Заполнять полигон (включая индексы)
+			polygon.vertices.push_back((*vertices)[i]);
+			polygonIndexed.indices.push_back(i);
 
-				// Если 3-ий индекс был добавлен, можно посчитать нормали
-				// и тангенты для полигона (присвоив их его вершинам) и перейти к следующему
-				if (count > 2) {
-					
-					glm::vec3 n = calcNormals ? poly.getNormal() : glm::vec3(0.0f, 0.0f, 0.0f);
-					glm::vec3 t = calcTangents ? poly.getUVTangent() : glm::vec3(0.0f, 0.0f, 0.0f);
+			// Когда 3 вершины были внесены (полигон построен)
+			if ((i + 1) % 3 == 0) {
 
-					for(unsigned int v = 0; v < 3; v++){
-						this->storedVertices_[poly.indices[v]].normal = n;
-						this->storedVertices_[poly.indices[v]].tangent = t;
-					}
+				// Посчитать нормаль и тангент полигона (если нужно)
+				glm::vec3 normal = polygon.calculateNormal(ccw);
+				glm::vec3 tangent = calcTangents ? polygon.calculateUVTangent() : glm::vec3(0.0f, 0.0f, 0.0f);
 
-					count = 0;
-					poly = {};
+				// Пройти по индексам вершин полигона - обновить данные в массиве
+				for(auto index : polygonIndexed.indices){
+					(*vertices)[index].normal = normal;
+					(*vertices)[index].tangent = tangent;
 				}
+
+				// Cбросить полигон
+				polygon.vertices.clear();
+				polygonIndexed.indices.clear();
 			}
 		}
 	}
@@ -166,8 +154,13 @@ namespace ogl
 		// Используются ли индексы
 		this->indexed_ = indices.size() > 0;
 
-		// Если нужно получить нормали
-		if (calcNormals || calcTangents) this->calculateAdditionalVectorsForStored(calcNormals, calcTangents);
+		// Если нужно посчитать нормали
+		if (calcNormals || calcTangents) {
+			// Для индексированной геометрии
+			if(this->indexed_) StaticGeometryResource::recalcNormalsForIndexed(&(this->storedVertices_), this->storedIndices_, calcTangents);
+			// Для не индексированной геометрии
+			else StaticGeometryResource::recalcNormalsForNonIndexed(&(this->storedVertices_), calcTangents);
+		}
 
 		// Регистрация VAO, VBO, EBO
 		glGenVertexArrays(1, &vaoId_);
