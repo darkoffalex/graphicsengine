@@ -1,5 +1,8 @@
 ﻿#include "StaticGeometryResource.h"
 #include <map>
+#include <algorithm>
+#include <iterator>
+#include <iostream>
 
 namespace ogl
 {
@@ -17,16 +20,16 @@ namespace ogl
 	*/
 	void StaticGeometryResource::recalcNormalsForIndexed(std::vector<Vertex>* vertices, const std::vector<glm::uint32>& indices, bool calcTangents, bool ccw)
 	{
-		// Ассоциативный массив
-		// Каждый индекс будет связан со всеми полигонами в которых он участвует
-		std::map<glm::uint32, std::vector<PolygonIndexed>> polygons;
+		// Ассоциативные массив (нормали и ангенты)
+		// Каждый индекс будет связан суммой нормалей (и тангентов) полигонов в которых участвует вершина под этим индексом
+		std::map<glm::uint32, glm::vec3> normals;
+		std::map<glm::uint32, glm::vec3> tangents;
 
 		// Временный полигон
 		PolygonIndexed polygon;
 
 		// Пройтись по всем индексам
-		// Для формирования массива связи каждой вершины и полигонов образованных ею
-		// Т.е выясняем в каких полигонах участвует вершина с конкретным индексом
+		// Для формирования массива связи каждой вершины и суммы нормалей ее полигонов
 		for (unsigned int i = 0; i < indices.size(); i++)
 		{
 			// Заполнять полигон
@@ -39,16 +42,18 @@ namespace ogl
 				for (auto index : polygon.indices)
 				{
 					// Если в ассоциативном массие нету такого ключа, добавить
-					// новый массив содержащий текущий полигон (по данному ключу)
-					if (polygons.find(index) == polygons.end())
+					// новую нормаль (и тангент, если надо) текущего полигона
+					if (normals.find(index) == normals.end())
 					{
-						polygons[index] = { polygon };
+						normals[index] = polygon.calculateNormal(*vertices);
+						if (calcTangents) tangents[index] = polygon.calculateNormal(*vertices);
 					}
 					// Если в ассоциативном массие есть такой ключ, добавить
-					// в массив под этим ключом текущий полигон
+					// к существующей нормали нормаль (и тангент, если надо) текущего полигона
 					else
 					{
-						polygons[index].push_back(polygon);
+						normals[index] += polygon.calculateNormal(*vertices);
+						if (calcTangents) tangents[index] += polygon.calculateNormal(*vertices);
 					}
 				}
 
@@ -57,28 +62,18 @@ namespace ogl
 			}
 		}
 
-		// Пройтись по ассоциативному массиву индексов для подсчета
-		// нормалей и тангентов
-		std::map<glm::uint32, std::vector<PolygonIndexed>>::iterator it;
-		for (it = polygons.begin(); it != polygons.end(); ++it)
+		// Пройтись по ассоциативному массиву индексов для установки значений вершинам в массиве
+		std::map<glm::uint32, glm::vec3>::iterator it;
+		for (it = normals.begin(); it != normals.end(); ++it)
 		{
-			// Сумма нормалей всех полигонов
-			glm::vec3 normalSum(0.0f, 0.0f, 0.0f);
-			// Сумма тангентов всех полигонов
-			glm::vec3 tangentSum(0.0f, 0.0f, 0.0f);
 			// Индекс вершины
 			glm::uint32 index = it->first;
+			// Сумма нормалей
+			glm::vec3 normalSum = it->second;
 
-			// Пройтись по всем полигонам в которых участвует проверяемая вершина
-			for (auto poly : it->second)
-			{
-				normalSum += poly.calculateNormal(*vertices, ccw);
-				if (calcTangents) tangentSum += poly.calculateUVTangent(*vertices);
-			}
-
-			// Установить новое значение нормали и тангента
+			// Установить новое значение нормали и тангента (если нужно)
 			(*vertices)[index].normal = glm::normalize(normalSum);
-			(*vertices)[index].tangent = glm::normalize(tangentSum);
+			if(calcTangents) (*vertices)[index].tangent = glm::normalize(tangents[index]);
 		}
 	}
 
@@ -124,14 +119,137 @@ namespace ogl
 	}
 
 	/**
+	* \brief Получить массив пересечений двух массивов
+	* \param a Первый массив
+	* \param b Второй массив
+	* \return Массив пересечений
+	*/
+	std::vector<glm::uint32> StaticGeometryResource::getIntersections(std::vector<glm::uint32> a, std::vector<glm::uint32> b)
+	{
+		std::vector<glm::uint32> result;
+		std::sort(a.begin(), a.end());
+		std::sort(b.begin(), b.end());
+		std::set_intersection(a.begin(), a.end(), b.begin(), b.end(), back_inserter(result));
+		return result;
+	}
+
+	/**
+	* \brief Построить геометрию с учетом смежных граней
+	* \details Метод может добавлять новые вершины в массив, следует это учитывать
+	* \param vertices Вершины
+	* \return Массив индексов
+	*/
+	std::vector<glm::uint32> StaticGeometryResource::buildAdjacency(std::vector<Vertex>* vertices, const std::vector<glm::uint32>& indices)
+	{
+		// Результирующие индексы с учетом смежностей
+		std::vector<glm::uint32> resultIndices;
+		// Список полигонов (формируется при проходе по индексам вершин)
+		std::vector<PolygonIndexed> polygons;
+		// Список пар, индекс вершины - соседних вершин
+		std::map<glm::uint32, std::vector<glm::uint32>> neighbors;
+
+		// Временный полигон
+		PolygonIndexed polygon;
+
+		// Пройтись по всем индексам
+		// Для формирования массива связи каждой вершины и ее соседей
+		for (unsigned int i = 0; i < indices.size(); i++)
+		{
+			// Заполнять полигон
+			polygon.indices.push_back(indices[i]);
+
+			// Когда 3 вершины были внесены (полигон построен)
+			if ((i + 1) % 3 == 0) {
+
+				// Пройтись по этим вершинам (их индексам)
+				for (auto index : polygon.indices)
+				{
+					// Для каждой вершины снова пройтись по всем вершинам
+					for (auto neighborIndex : polygon.indices)
+					{
+						// Только для соседних вершин (игнорировать текущую)
+						if (neighborIndex != index)
+						{
+							// Добавить индексы соседних вершин
+							if (neighbors.find(index) == neighbors.end()) neighbors[index] = { neighborIndex };
+							else neighbors[index].push_back(neighborIndex);
+						}
+					}
+				}
+
+				// Добавить полигон в список полигонов
+				polygons.push_back(polygon);
+
+				// Cбросить полигон
+				polygon.indices.clear();
+			}
+		}
+
+		// Пройтись по всем полигонам
+		for (auto polygonEntry : polygons)
+		{
+			// Индексы нового полигона с учетом смежных
+			std::vector<glm::uint32> adjacent = {
+				polygonEntry.indices[0],
+				0,
+				polygonEntry.indices[1],
+				0,
+				polygonEntry.indices[2],
+				0
+			};
+
+			// Пройти по всем вершинам
+			for (glm::uint32 i = 0; i < polygonEntry.indices.size(); i++)
+			{
+				// Текущая вершина и следуюшая
+				glm::uint32 i0 = polygonEntry.indices[i];
+				glm::uint32 i1 = polygonEntry.indices[(i + 1) % 3];
+
+				// Найти пересечения соседних вершин
+				auto intersections = getIntersections(neighbors[i0], neighbors[i1]);
+
+				// Индекс смежного полигона для ребра i0-i1;
+				glm::i32 intersection = -1;
+				for (auto intersectionEntry : intersections)
+				{
+					// Если это не вершина этого полигона - значит это оно
+					if (!polygonEntry.hasIndex(intersectionEntry))
+					{
+						intersection = static_cast<glm::i32>(intersectionEntry);
+						break;
+					}
+				}
+
+				// Если индекс смежного полигона получен - записать его
+				if (intersection > -1) {
+					adjacent[2 * i + 1] = static_cast<glm::uint32>(intersection);
+				}
+				// Если не получен - создать фантомную вершину и записать ее индекс
+				else {
+					Vertex v = {};
+					v.phantom = 1;
+					vertices->push_back(v);
+					adjacent[2 * i + 1] = static_cast<glm::uint32>(vertices->size() - 1);
+				}
+			}
+
+			// Добавить к общему результату
+			resultIndices.insert(resultIndices.end(), adjacent.begin(), adjacent.end());
+		}
+
+		return resultIndices;
+	}
+
+	/**
 	* \brief Конструктор
 	* \param vertices Массив вершин
 	* \param indices Массив индексов
 	* \param storeData Хранить дубликат данных в оперативной памяти
 	* \param calcNormals Вычислить нормали
 	* \param calcTangents Вычислить тангенты
+	* \param adjacency Построить геометрию со смежностями
 	*/
-	StaticGeometryResource::StaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData, bool calcNormals, bool calcTangents)
+	StaticGeometryResource::StaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData, bool calcNormals, bool calcTangents, bool adjacency)
 	{
 		// Инициализация GLEW
 		if (!_isGlewInitialised) {
@@ -162,6 +280,9 @@ namespace ogl
 			else StaticGeometryResource::recalcNormalsForNonIndexed(&(this->storedVertices_), calcTangents);
 		}
 
+		// Массив индексов геометрии со смежностями
+		std::vector<GLuint> adjacentIndices;
+
 		// Регистрация VAO, VBO, EBO
 		glGenVertexArrays(1, &vaoId_);
 		glGenBuffers(1, &vboId_);
@@ -173,6 +294,13 @@ namespace ogl
 		// Работаем с VAO
 		glBindVertexArray(vaoId_);
 
+		// Если нужно строить смежные полигоны
+		if(adjacency){
+			adjacentIndices = StaticGeometryResource::buildAdjacency(&(this->storedVertices_), this->storedIndices_);
+			this->indexCount_ = adjacentIndices.size();
+			this->vertexCount_ = this->storedVertices_.size();
+		}
+
 		// Работаем с буфером вершин, помещаем в него данные
 		glBindBuffer(GL_ARRAY_BUFFER, vboId_);
 		glBufferData(GL_ARRAY_BUFFER, this->storedVertices_.size() * sizeof(Vertex), this->storedVertices_.data(), GL_STATIC_DRAW);
@@ -180,7 +308,7 @@ namespace ogl
 		// Работаем с буфером индексов, помещаем в него данные
 		if (indexed_) {
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId_);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, this->storedIndices_.size() * sizeof(GLuint), this->storedIndices_.data(), GL_STATIC_DRAW);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, (adjacency ? adjacentIndices.size() : this->storedIndices_.size()) * sizeof(GLuint), adjacency ? adjacentIndices.data() : storedIndices_.data(), GL_STATIC_DRAW);
 		}
 
 		// Если хранить в опертивной памяти данные вершин не нужно - очистить
@@ -336,10 +464,11 @@ namespace ogl
 	* \param storeData Хранить дубликат данных в оперативной памяти
 	* \param calcNormals Вычислить нормали
 	* \param calcTangents Вычислить тангенты
+	* \param adjacency Построить геометрию со смежностями
 	* \return Умный указатель на ресурс
 	*/
-	StaticGeometryResourcePtr MakeStaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData, bool calcNormals, bool calcTangents)
+	StaticGeometryResourcePtr MakeStaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData, bool calcNormals, bool calcTangents, bool adjacency)
 	{
-		return std::make_shared<StaticGeometryResource>(vertices, indices, storeData, calcNormals, calcTangents);
+		return std::make_shared<StaticGeometryResource>(vertices, indices, storeData, calcNormals, calcTangents, adjacency);
 	}
 }

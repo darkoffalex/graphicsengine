@@ -95,9 +95,10 @@ public:
 	 * \brief Создать ресурс статической геометрии для OpenGL рендерера
 	 * \param inverseOrder Изменить порядок следования вершин в полигонах (против/по часовой стрелке)
 	 * \param recalcNormals Пересчитать нормали (дорогая операция)
+	 * \param adjacency Построить геометрию со смежностями
 	 * \return Указатель на ресурс для OpenGL рендерера
 	 */
-	ogl::StaticGeometryResourcePtr MakeOglRendererResource(bool inverseOrder = false, bool recalcNormals = false);
+	ogl::StaticGeometryResourcePtr MakeOglRendererResource(bool inverseOrder = false, bool recalcNormals = false, bool adjacency = false);
 
 	/**
 	 * \brief Конструктор по умолчанию

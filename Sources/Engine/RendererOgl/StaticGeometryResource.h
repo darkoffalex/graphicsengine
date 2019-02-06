@@ -57,6 +57,23 @@ namespace ogl
 		 * \param ccw Обход вершин против часовой стрелки
 		 */
 		static void recalcNormalsForNonIndexed(std::vector<Vertex>* vertices, bool calcTangents = false, bool ccw = false);
+
+		/**
+		 * \brief Получить массив пересечений двух массивов
+		 * \param a Первый массив
+		 * \param b Второй массив
+		 * \return Массив пересечений
+		 */
+		static std::vector<glm::uint32> getIntersections(std::vector<glm::uint32> a, std::vector<glm::uint32> b);
+
+		/**
+		* \brief Построить геометрию с учетом смежных граней
+		* \details Метод может добавлять новые вершины в массив, следует это учитывать
+		* \param vertices Вершины
+		* \return Массив индексов
+		*/
+		static std::vector<glm::uint32> buildAdjacency(std::vector<Vertex>* vertices, const std::vector<glm::uint32>& indices);
+
 	public:
 
 		/**
@@ -66,8 +83,9 @@ namespace ogl
 		 * \param storeData Хранить дубликат данных в оперативной памяти
 		 * \param calcNormals Вычислить нормали
 		 * \param calcTangents Вычислить тангенты
+		 * \param adjacency Построить геометрию со смежностями
 		 */
-		StaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices = {}, bool storeData = false, bool calcNormals = false, bool calcTangents = false);
+		StaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices = {}, bool storeData = false, bool calcNormals = false, bool calcTangents = false, bool adjacency = false);
 
 		/**
 		 * \brief Деструктор
@@ -131,7 +149,8 @@ namespace ogl
 	 * \param storeData Хранить дубликат данных в оперативной памяти
 	 * \param calcNormals Вычислить нормали
 	 * \param calcTangents Вычислить тангенты
+	 * \param adjacency Построить геометрию со смежностями
 	 * \return Умный указатель на ресурс
 	 */
-	StaticGeometryResourcePtr MakeStaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData = false, bool calcNormals = false, bool calcTangents = false);
+	StaticGeometryResourcePtr MakeStaticGeometryResource(const std::vector<Vertex>& vertices, const std::vector<GLuint>& indices, bool storeData = false, bool calcNormals = false, bool calcTangents = false, bool adjacency = false);
 }

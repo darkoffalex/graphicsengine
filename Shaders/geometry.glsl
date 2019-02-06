@@ -78,7 +78,7 @@ void main()
 #version 330 core
 
 // На входе треугольники
-layout (triangles) in;
+layout (triangles_adjacency) in;
 // На выходе треугольники
 layout (triangle_strip, max_vertices = 3) out;
 
@@ -110,15 +110,15 @@ out GS_OUT
 } gs_out;
 
 // Подсчет тангента для полигона
-vec3 calcTangent()
+vec3 calcTangent(vec3 v0, vec3 v1, vec3 v2, vec2 uv0, vec2 uv1, vec2 uv2)
 {
 	// Грани полигона в виде векторов
-	vec3 edge1 = gs_in[1].vertexPosLoc - gs_in[0].vertexPosLoc;
-	vec3 edge2 = gs_in[2].vertexPosLoc - gs_in[0].vertexPosLoc;
+	vec3 edge1 = v1 - v0;
+	vec3 edge2 = v2 - v0;
 
 	// Дельта UV для каждой грани
-	vec2 deltaUV1 = gs_in[1].uvBump - gs_in[0].uvBump;
-	vec2 deltaUV2 = gs_in[2].uvBump - gs_in[0].uvBump;
+	vec2 deltaUV1 = uv1 - uv0;
+	vec2 deltaUV2 = uv2 - uv0;
 
 	// Коэффициент для подсчета тангента
 	float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
@@ -141,28 +141,44 @@ vec3 OrthogonalizeTangent(vec3 tangent, vec3 vertexNormal)
 void main() 
 {
 	// Тангент полигона
-	vec3 polygonTangent = calcTangent();
+	vec3 polygonTangent = calcTangent(
+		gs_in[0].vertexPosLoc,
+		gs_in[2].vertexPosLoc,
+		gs_in[4].vertexPosLoc,
+		gs_in[0].uvBump,
+		gs_in[2].uvBump,
+		gs_in[4].uvBump);
 
 	// Пройтись по всем вершинам
-	for(int i = 0; i < 3; i++)
+	for(int i = 0; i < gl_in.length(); i++)
 	{
-		// Пропуск основных параметров во фрагментный шейдер как есть
-		gl_Position = gl_in[i].gl_Position;
-		gs_out.color = gs_in[i].color;
-		gs_out.uvDiffuse = gs_in[i].uvDiffuse;
-		gs_out.uvSpecular = gs_in[i].uvSpecular;
-		gs_out.uvBump = gs_in[i].uvBump;
-		gs_out.normal = gs_in[i].normal;
-		gs_out.fragmentPos = gs_in[i].vertexPos;
+		switch(i)
+		{
+			case 0:
+			case 2:
+			case 4:
 
-		// Собрать TBN матрицу (касательного-мирового пространства)
-		vec3 T = OrthogonalizeTangent(gs_in[i].normalMatrix * polygonTangent, gs_in[i].normal);
-		vec3 B = cross(gs_in[i].normal, T);
-		vec3 N = gs_in[i].normal;
-		gs_out.tbnMatrix = mat3(T,B,N);
+			// Пропуск основных параметров во фрагментный шейдер как есть
+			gl_Position = gl_in[i].gl_Position;
+			gs_out.color = gs_in[i].color;
+			gs_out.uvDiffuse = gs_in[i].uvDiffuse;
+			gs_out.uvSpecular = gs_in[i].uvSpecular;
+			gs_out.uvBump = gs_in[i].uvBump;
+			gs_out.normal = gs_in[i].normal;
+			gs_out.fragmentPos = gs_in[i].vertexPos;
 
-		// Добавить вершину
-		EmitVertex();
+			// Собрать TBN матрицу (касательного-мирового пространства)
+			vec3 T = OrthogonalizeTangent(gs_in[i].normalMatrix * polygonTangent, gs_in[i].normal);
+			vec3 B = cross(gs_in[i].normal, T);
+			vec3 N = gs_in[i].normal;
+			gs_out.tbnMatrix = mat3(T,B,N);
+
+			// Добавить вершину
+			EmitVertex();
+
+			default:
+			break;
+		}
 	}
 	EndPrimitive();
 }

@@ -129,9 +129,12 @@ void ObjLoader::Clear()
 
 /**
 * \brief Создать ресурс статической геометрии для OpenGL рендерера
-* \return Указатель на ресурс
+* \param inverseOrder Изменить порядок следования вершин в полигонах (против/по часовой стрелке)
+* \param recalcNormals Пересчитать нормали (дорогая операция)
+* \param adjacency Построить геометрию со смежностями
+* \return Указатель на ресурс для OpenGL рендерера
 */
-ogl::StaticGeometryResourcePtr ObjLoader::MakeOglRendererResource(bool inverseOrder, bool recalcNormals)
+ogl::StaticGeometryResourcePtr ObjLoader::MakeOglRendererResource(bool inverseOrder, bool recalcNormals, bool adjacency)
 {
 	// Массив вершин
 	std::vector<ogl::Vertex> vertices;
@@ -209,6 +212,6 @@ ogl::StaticGeometryResourcePtr ObjLoader::MakeOglRendererResource(bool inverseOr
 		indices.insert(indices.end(), indicesTemp.begin(), indicesTemp.end());
 	}
 
-	return ogl::MakeStaticGeometryResource(vertices, indices, false, recalcNormals);
+	return ogl::MakeStaticGeometryResource(vertices, indices, false, recalcNormals, false, adjacency);
 }
 

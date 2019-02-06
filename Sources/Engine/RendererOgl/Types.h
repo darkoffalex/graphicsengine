@@ -16,6 +16,7 @@ namespace ogl
 		glm::vec2 uv;          // Координаты текустуры
 		glm::vec3 normal;      // Нормаль
 		glm::vec3 tangent;     // Вектор касательной (тангент)
+		glm::i32 phantom;      // Фантомная вершина (используется при построении виртуальных смежный полигонов)
 	};
 
 	/**
@@ -64,6 +65,13 @@ namespace ogl
 		* \return Тангент
 		*/
 		glm::vec3 calculateUVTangent(const std::vector<Vertex>& vertices);
+
+		/**
+		* \brief Есть ли такой индекс
+		* \param index Индекс
+		* \return Да или нет
+		*/
+		bool hasIndex(glm::uint32 index);
 	};
 
 	/**

@@ -238,13 +238,13 @@ void Load()
 		{ { 10.0f, 0.0f, 10.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
 		{ { -10.0f, 0.0f, 10.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,0.0f } },
 		{ { -10.0f,  0.0f, -10.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
-	}, { 0,1,2, 0,2,3 }, false, true, false);
+	},{0,1,2, 0,2,3},false,true,false,true);
 
 	// Геометрия используемая для кубов
 	_sceneResources.geometry.cube = ogl::MakeStaticGeometryResource(
 		ogl::defaults::GetVertices(ogl::defaults::DefaultGeometryType::CUBE, 1.0f), 
 		ogl::defaults::GetIndices(ogl::defaults::DefaultGeometryType::CUBE), 
-		false, true, false);
+		false, true, false, true);
 
 	// Геометрия используемая для стены
 	_sceneResources.geometry.wall = ogl::MakeStaticGeometryResource({
@@ -252,12 +252,12 @@ void Load()
 		{ { 5.0f, -5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 1.0f,0.0f } },
 		{ { -5.0f, -5.0f, 0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,0.0f } },
 		{ { -5.0f, 5.0f,  0.0f },{ 1.0f,1.0f,1.0f },{ 0.0f,1.0f } },
-	}, { 0,1,2, 0,2,3 }, false, true, false);
+	}, { 0,1,2, 0,2,3 }, false, true, false, true);
 
 	// Геометрия башки негра
 	ObjLoader loader;
 	loader.LoadFromFile(ExeDir().append("..\\Models\\head\\african_head.obj"));
-	_sceneResources.geometry.head = loader.MakeOglRendererResource(true, true);
+	_sceneResources.geometry.head = loader.MakeOglRendererResource(true, true, true);
 	loader.Clear();
 
 	// Т Е К С Т У Р Ы
@@ -341,7 +341,7 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
-	_pRenderer->getLights()[0]->rotation.x += frameDeltaMs * 0.05f;
+	//_pRenderer->getLights()[0]->rotation.x += frameDeltaMs * 0.05f;
 
 	// Если есть камера
 	if(_pCamera != nullptr)

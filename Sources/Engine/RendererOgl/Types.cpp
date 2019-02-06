@@ -75,4 +75,14 @@ namespace ogl
 
 		return p.calculateUVTangent();
 	}
+
+	/**
+	* \brief Есть ли такой индекс
+	* \param index Индекс
+	* \return Да или нет
+	*/
+	bool PolygonIndexed::hasIndex(glm::uint32 index)
+	{
+		return std::find(this->indices.begin(), this->indices.end(), index) != this->indices.end();
+	}
 }

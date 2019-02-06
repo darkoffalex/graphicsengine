@@ -232,7 +232,7 @@ namespace ogl
 
 				// Рисовать либо индексированную либо не-индексированную геометрию
 				if (part.getGeometry()->IsIndexed()) {
-					glDrawElements(GL_TRIANGLES, part.getGeometry()->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+					glDrawElements(GL_TRIANGLES_ADJACENCY, part.getGeometry()->getIndexCount(), GL_UNSIGNED_INT, nullptr);
 				}
 				else {
 					glDrawArrays(GL_TRIANGLES, 0, part.getGeometry()->getVertexCount());
