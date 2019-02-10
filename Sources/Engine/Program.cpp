@@ -33,6 +33,7 @@ struct{
 		ogl::ShaderResourcePtr geometry;
 		ogl::ShaderResourcePtr lighting;
 		ogl::ShaderResourcePtr postProcessing;
+		ogl::ShaderResourcePtr shadows;
 	} shaders;
 
 	// Текстуры
@@ -46,10 +47,6 @@ struct{
 		ogl::TextureResourcePtr wallDiffuse;
 		ogl::TextureResourcePtr wallSpecular;
 		ogl::TextureResourcePtr wallBump;
-
-		ogl::TextureResourcePtr headDiffuse;
-		ogl::TextureResourcePtr headSpecular;
-		ogl::TextureResourcePtr headBump;
 	} textures;
 
 	// Геометрия
@@ -57,7 +54,7 @@ struct{
 		ogl::StaticGeometryResourcePtr ground;
 		ogl::StaticGeometryResourcePtr wall;
 		ogl::StaticGeometryResourcePtr cube;
-		ogl::StaticGeometryResourcePtr head;
+		ogl::StaticGeometryResourcePtr cylinder;
 	} geometry;
 } _sceneResources;
 
@@ -120,7 +117,7 @@ int main(int argc, char* argv[])
 			L"Graphics",
 			WS_OVERLAPPEDWINDOW,
 			0, 0,
-			1280, 768,
+			1400, 1000,
 			NULL,
 			NULL,
 			hInstance,
@@ -149,11 +146,12 @@ int main(int argc, char* argv[])
 			hWnd, 
 			_sceneResources.shaders.geometry, 
 			_sceneResources.shaders.lighting, 
-			_sceneResources.shaders.postProcessing
+			_sceneResources.shaders.postProcessing,
+			_sceneResources.shaders.shadows
 		);
 
 		// Создать камеру
-		_pCamera = new CameraControllable(1.5f, 0.3f, _pRenderer->viewPort.getAspectRatio());
+		_pCamera = new CameraControllable(1.5f, 0.3f, _pRenderer->viewPort.getAspectRatio(),0.1f,1000.0f);
 		_pCamera->position = { 0.0f,0.0f,3.0f };
 		_pCamera->rotation.x = -10.0f;
 
@@ -224,11 +222,13 @@ void Load()
 	std::string geometryShaderSource = LoadStringFromFile(ShadersDir().append("geometry.glsl"));
 	std::string lightingShaderSource = LoadStringFromFile(ShadersDir().append("lighting.glsl"));
 	std::string postProcessingShaderSource = LoadStringFromFile(ShadersDir().append("post.glsl"));
+	std::string shadowVolumeSource = LoadStringFromFile(ShadersDir().append("shadows.glsl"));
 
 	// Создать шейдерные программы
 	_sceneResources.shaders.geometry = ogl::MakeShaderResource(geometryShaderSource);
 	_sceneResources.shaders.lighting = ogl::MakeShaderResource(lightingShaderSource);
 	_sceneResources.shaders.postProcessing = ogl::MakeShaderResource(postProcessingShaderSource);
+	_sceneResources.shaders.shadows = ogl::MakeShaderResource(shadowVolumeSource);
 
 	// Г Е О М Е Т Р И Я
 
@@ -256,9 +256,10 @@ void Load()
 
 	// Геометрия башки негра
 	ObjLoader loader;
-	loader.LoadFromFile(ExeDir().append("..\\Models\\head\\african_head.obj"));
-	_sceneResources.geometry.head = loader.MakeOglRendererResource(true, true, true);
+	loader.LoadFromFile(ExeDir().append("..\\Models\\cylinder\\cylinder.obj"));
+	_sceneResources.geometry.cylinder = loader.MakeOglRendererResource(true, true, true);
 	loader.Clear();
+	
 
 	// Т Е К С Т У Р Ы
 
@@ -271,6 +272,11 @@ void Load()
 	_sceneResources.textures.groundDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
+	// Текустура кубов
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\concrete.jpg").c_str(), &width, &height, &bpp, 3);
+	_sceneResources.textures.cubeBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	stbi_image_free(textureBytes);
+
 	// Текстуры стены
 	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
@@ -280,19 +286,6 @@ void Load()
 	_sceneResources.textures.wallBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
-	// Текстуры башки негра
-	stbi_set_flip_vertically_on_load(true);
-	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_diffuse.tga").c_str(), &width, &height, &bpp, 3);
-	_sceneResources.textures.headDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
-	stbi_image_free(textureBytes);
-
-	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_spec.tga").c_str(), &width, &height, &bpp, 3);
-	_sceneResources.textures.headSpecular = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
-	stbi_image_free(textureBytes);
-
-	textureBytes = stbi_load(ExeDir().append("..\\Models\\head\\african_head_bump.tga").c_str(), &width, &height, &bpp, 3);
-	_sceneResources.textures.headBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
-	stbi_image_free(textureBytes);
 }
 
 /**
@@ -316,23 +309,35 @@ void Init(ogl::Renderer* pRenderer)
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
 
-	// Добавить к отрисовке куб
-	ogl::StaticMeshPtr cube = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
-	cube->position = { 0.0f,-0.75f,-1.0f };
-	cube->scale = { 0.5f,0.5f,0.5f };
+	// Добавить к отрисовке цилиндр
+	ogl::StaticMeshPtr cylinder = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cylinder)));
+	cylinder->getParts()[0].diffuseTexture.resource = _sceneResources.textures.wallDiffuse;
+	cylinder->getParts()[0].specularTexture.resource = _sceneResources.textures.wallSpecular;
+	cylinder->getParts()[0].bumpTexture.resource = _sceneResources.textures.wallBump;
+	cylinder->getParts()[0].diffuseTexture.scale = { 3.0f,1.0f };
+	cylinder->getParts()[0].specularTexture.scale = { 3.0f,1.0f };
+	cylinder->getParts()[0].bumpTexture.scale = { 3.0f,1.0f };
+	cylinder->position = { 0.0f,0.0f,-1.0f };
+	cylinder->scale = { 0.3f,0.3f,0.3f };
 
-	// Добавить к отрисовке башку негра
-	ogl::StaticMeshPtr head = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.head)));
-	head->getParts()[0].diffuseTexture.resource = _sceneResources.textures.headDiffuse;
-	head->getParts()[0].specularTexture.resource = _sceneResources.textures.headSpecular;
-	head->getParts()[0].bumpTexture.resource = _sceneResources.textures.headBump;
-	head->position = { 0.0f,-0.35f,-1.0f };
-	head->scale = { 0.3f,0.3f,0.3f };
+	ogl::StaticMeshPtr cube0 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube0->position = { -2.0f,-0.75f,-1.5f };
+	cube0->rotation = { 0.0f,20.0f,0.0f };
+	//cube0->getParts()[0].bumpTexture.resource = _sceneResources.textures.cubeBump;
+	//cube0->getParts()[0].bumpTexture.scale = { 2.0f,2.0f };
+	cube0->scale = { 0.5f,0.5f,0.5f };
+
+	ogl::StaticMeshPtr cube1 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
+	cube1->position = { 2.0f,-0.75f,-1.5f };
+	cube1->rotation = { 0.0f,20.0f,0.0f };
+	//cube1->getParts()[0].bumpTexture.resource = _sceneResources.textures.cubeBump;
+	//cube1->getParts()[0].bumpTexture.scale = { 2.0f,2.0f };
+	cube1->scale = { 0.5f,0.5f,0.5f };
 
 	// Добавить источники света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,0.5f,0.5f }, { -30.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
-	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
-	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.8f,0.8f,0.8f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,1.5f,0.5f }, { 0.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.7f,0.9f,0.8f }));
+	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.9f,0.8f,0.7f }));
 }
 
 /**
@@ -341,7 +346,23 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
-	//_pRenderer->getLights()[0]->rotation.x += frameDeltaMs * 0.05f;
+	static GLfloat lSpeed = 1.0f;
+	static GLfloat rSpeed = -1.0f;
+
+	ogl::LightPtr central = _pRenderer->getLights()[0];
+	ogl::LightPtr left = _pRenderer->getLights()[1];
+	ogl::LightPtr right = _pRenderer->getLights()[2];
+
+	central->rotation.x += frameDeltaMs * 0.05f;
+
+	left->position.x += frameDeltaMs * lSpeed * 0.0015f;
+	right->position.x += frameDeltaMs * rSpeed * 0.0015f;
+
+	if (left->position.x > 10.0f || left->position.x < -10.0f) lSpeed *= -1;
+	if (right->position.x > 10.0f || right->position.x < -10.0f) rSpeed *= -1;
+
+	_pRenderer->getStaticMeshes()[2]->rotation.y += frameDeltaMs * 0.05f;
+	_pRenderer->getStaticMeshes()[2]->rotation.x += frameDeltaMs * 0.05f;
 
 	// Если есть камера
 	if(_pCamera != nullptr)

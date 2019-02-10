@@ -59,6 +59,7 @@
     <None Include="..\..\Shaders\geometry.glsl" />
     <None Include="..\..\Shaders\lighting.glsl" />
     <None Include="..\..\Shaders\post.glsl" />
+    <None Include="..\..\Shaders\shadows.glsl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{97E7F44E-937D-4C79-9272-E6C507B7D2C5}</ProjectGuid>

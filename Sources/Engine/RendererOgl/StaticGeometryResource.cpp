@@ -372,12 +372,22 @@ namespace ogl
 			reinterpret_cast<GLvoid*>(offsetof(Vertex, tangent)) // Сдвиг (с какого места в блоке данных начинается нужная часть)
 		);
 
+		// Аттрибут "фантомная вершина"
+		glVertexAttribPointer(
+			5,                           // Номер положения (location у шейдера) 
+			1,                           // Размер (сколько значений конктерного типа приходится на один атрибут) 
+			GL_UNSIGNED_INT,             // Конкретный тип одного значения 
+			GL_FALSE,                    // Не нормализовать 
+			sizeof(Vertex),              // Размер шага (размер одной вершины) 
+			reinterpret_cast<GLvoid*>(offsetof(Vertex, phantom)) // Сдвиг (с какого места в блоке данных начинается нужная часть)
+		);
+
 		// Включить аттрибуты
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
 		glEnableVertexAttribArray(2);
 		glEnableVertexAttribArray(3);
-		glEnableVertexAttribArray(4);
+		glEnableVertexAttribArray(5);
 
 		// Завершаем работу с VAO
 		glBindVertexArray(0);

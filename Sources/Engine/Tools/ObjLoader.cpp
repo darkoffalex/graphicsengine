@@ -195,6 +195,8 @@ ogl::StaticGeometryResourcePtr ObjLoader::MakeOglRendererResource(bool inverseOr
 				});
 
 				v.color = { 1.0f,1.0f,1.0f };
+				v.tangent = {0.0f,0.0f,0.0f};
+				v.phantom = 0;
 
 				// Добавить саму вершину в массив
 				vertices.push_back(v);

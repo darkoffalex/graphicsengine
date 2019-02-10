@@ -17,6 +17,7 @@ namespace ogl
 			PLANE,
 			CUBE,
 			CUBE_SKYBOX,
+			CUBE_FULLY_INDEXED,
 			PYRAMID,
 			SPHERE
 		};

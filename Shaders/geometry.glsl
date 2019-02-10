@@ -6,6 +6,7 @@ layout(location = 0) in vec3 position;   // Положение
 layout(location = 1) in vec3 color;      // Цвет
 layout(location = 2) in vec2 uv;         // Текстурные координаты
 layout(location = 3) in vec3 normal;     // Нормаль
+layout(location = 5) in uint phantom;    // Фантомная вершина
 
 // Структура описывающая параметры мапинга текстуры
 struct TextureMapping
@@ -110,7 +111,7 @@ out GS_OUT
 } gs_out;
 
 // Подсчет тангента для полигона
-vec3 calcTangent(vec3 v0, vec3 v1, vec3 v2, vec2 uv0, vec2 uv1, vec2 uv2)
+vec3 CalcTangent(vec3 v0, vec3 v1, vec3 v2, vec2 uv0, vec2 uv1, vec2 uv2)
 {
 	// Грани полигона в виде векторов
 	vec3 edge1 = v1 - v0;
@@ -141,7 +142,7 @@ vec3 OrthogonalizeTangent(vec3 tangent, vec3 vertexNormal)
 void main() 
 {
 	// Тангент полигона
-	vec3 polygonTangent = calcTangent(
+	vec3 polygonTangent = CalcTangent(
 		gs_in[0].vertexPosLoc,
 		gs_in[2].vertexPosLoc,
 		gs_in[4].vertexPosLoc,

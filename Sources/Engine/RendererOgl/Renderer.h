@@ -66,6 +66,7 @@ namespace ogl
 			ShaderResourcePtr shaderLighting_;
 			ShaderResourcePtr shaderPostProcessing_;
 			ShaderResourcePtr shaderSolidColor_;
+			ShaderResourcePtr shaderShadowVolumes_;
 		} shaders_;
 
 		// Г Е О М Е Т Р И Я  П О  У М О Л Ч А Н И Ю
@@ -143,6 +144,13 @@ namespace ogl
 		void renderPassGeometry(GLuint shaderID, glm::vec4 clearColor, GLbitfield clearMask);
 
 		/**
+		 * \brief Проход для построения теневых объемов и записи инаформации о тени в stencil-буфер
+		 * \param light Источник освещения
+		 * \param shaderID Шейдер для построения теневых объемов
+		 */
+		void renderPassShadows(LightPtr light, GLuint shaderID);
+
+		/**
 		 * \brief Проход рендеринга освещенности (один источником света)
 		 * \details Данный метод вызывается многократно (для нескольких источников), результаты буфера суммируются
 		 * \param light Источник света
@@ -200,7 +208,7 @@ namespace ogl
 		 * \param lightning Шейдер для подсчета освещенности
 		 * \param postProcessing Шейдер для пост-обработки
 		 */
-		Renderer(HWND hwnd, ShaderResourcePtr geometry, ShaderResourcePtr lightning, ShaderResourcePtr postProcessing);
+		Renderer(HWND hwnd, ShaderResourcePtr geometry, ShaderResourcePtr lightning, ShaderResourcePtr postProcessing, ShaderResourcePtr shadows);
 
 		/**
 		 * \brief Освобождение памяти

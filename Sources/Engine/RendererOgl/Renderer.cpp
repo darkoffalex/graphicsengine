@@ -247,6 +247,95 @@ namespace ogl
 	}
 
 	/**
+	* \brief Проход для построения теневых объемов и записи инаформации о тени в stencil-буфер
+	* \param light Источник освещения
+	* \param shaderID Шейдер для построения теневых объемов
+	*/
+	void Renderer::renderPassShadows(LightPtr light, GLuint shaderID)
+	{
+		// Включить тест глубины
+		glEnable(GL_DEPTH_TEST);
+		// Отключить отбрасывание граней (нам нужны обе стороны теневого объема)
+		glDisable(GL_CULL_FACE);
+		// Отключаеи запись в Z-буфер
+		glDepthMask(GL_FALSE);
+		// Предотвращаем отсечение бесконечно далеких фрагментов
+		glEnable(GL_DEPTH_CLAMP);
+		// Полигональный свдиг глубины (во избежании z-figting'а полигонов теневого объема и геометрии)
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(0.0f, 100.0f);
+
+		// Установка размеров области вида
+		glViewport(0, 0, this->viewPort.width, this->viewPort.height);
+
+		// Активировать фрейм-буфер (рендеринг во фрейм-буфер)
+		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+
+		// Очистить stencil буфер
+		glClear(GL_STENCIL_BUFFER_BIT);
+
+		// Отключить рисование в цветовой буфер (тени рисуются только в stencil, при этом учитывая Z-буфер)
+		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+		// Активировать stencil-тест, но он должен всегда проходить успешно
+		glEnable(GL_STENCIL_TEST);
+		glStencilFunc(GL_ALWAYS, 0, 0xff);
+
+		// Алгоритм Z-fail. В начале рисуем нелицевые полигоны теневого объема, увелививая stencil значение для них на 1
+		// Затем, рисуя лицевые, от того что есть единицу. В итоге затененных областях остануться единицы
+		glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
+		glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
+
+		// Использовать шейдер
+		glUseProgram(shaderID);
+
+		// Передать матрицы вида, проекции, положение источника освещения в шейдер
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
+		glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
+		glUniform3fv(glGetUniformLocation(shaderID, "lightPosition"), 1, glm::value_ptr(light->position));
+
+		// Пройтись по всем статическим мешам
+		for (auto staticMesh : this->staticMeshes_)
+		{
+			// Пройтись по всем частям меша
+			for (auto part : staticMesh->getParts())
+			{
+				// Передать матрицу модели в шейдер
+				glm::mat4 mdodelMatrix = staticMesh->getModelMatrix();
+				glUniformMatrix4fv(glGetUniformLocation(shaderID, "model"), 1, GL_FALSE, glm::value_ptr(mdodelMatrix));
+
+				// Привязать VAO
+				glBindVertexArray(part.getGeometry()->getVaoId());
+
+				// Рисовать только индексированную геометрию со смежностями
+				if (part.getGeometry()->IsIndexed()) {
+					glDrawElements(GL_TRIANGLES_ADJACENCY, part.getGeometry()->getIndexCount(), GL_UNSIGNED_INT, nullptr);
+				}
+
+				// Отвязка VAO
+				glBindVertexArray(0);
+			}
+		}
+
+
+		// Возвращаем тест глубины в исходное состояние
+		glDisable(GL_DEPTH_TEST);
+		// Возвращаем culling в исходное состояние
+		glEnable(GL_CULL_FACE);
+		// Возвращаем запись в z-буфер в исходное состояние
+		glDepthMask(GL_TRUE);
+		// Отключаем клэмпинг бесконечно далеких фрагментов (возвращаем в исходное)
+		glDisable(GL_DEPTH_CLAMP);
+		// Полигональный свдиг глубины (возвращаем старое значение)
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(0, 0);
+		// Снова включить рисование в цветовой буфер
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		// Отключить тест трафарета
+		glDisable(GL_STENCIL_TEST);
+	}
+
+	/**
 	* \brief Проход рендеринга освещенности (один источником света)
 	* \details Данный метод вызывается многократно (для нескольких источников), результаты буфера суммируются
 	* \param light Источник света
@@ -263,6 +352,13 @@ namespace ogl
 
 		// Активировать фрейм-буфер (рендеринг во фрейм-буфер)
 		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+
+		// Включить тест трафарета
+		glEnable(GL_STENCIL_TEST);
+		// Тест трафарета считается пройденым если значение в нем равно нулю
+		glStencilFunc(GL_EQUAL, 0x0, 0xFF);
+		// Не обновлять тест трафарета
+		//glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);
 
 		// Включть аддтимвное смешивание (предыдущй цвет складывается с текущим)
 		glEnable(GL_BLEND);
@@ -288,9 +384,6 @@ namespace ogl
 
 		// Отключить тест глубины
 		glDisable(GL_DEPTH_TEST);
-
-		// Отключить тест трафарета
-		glDisable(GL_STENCIL_TEST);
 
 		// Привязать VAO (геометрия квадрата)
 		glBindVertexArray(this->defaultGeometry_.quad->getVaoId());
@@ -349,6 +442,9 @@ namespace ogl
 
 		// Отключить смешивание
 		glDisable(GL_BLEND);
+
+		// Отключить тест трафарета
+		glDisable(GL_STENCIL_TEST);
 	}
 
 	/**
@@ -364,9 +460,9 @@ namespace ogl
 		glUseProgram(shaderID);
 
 		// Скопировать значения глубины из G-буфера во фрейм-буфер (чтобы объекты не рендерелись поверх всего подряд)
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, this->gBuffer_.gBufferId);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
-		glBlitFramebuffer(0, 0, this->viewPort.width, this->viewPort.height, 0, 0, this->viewPort.width, this->viewPort.height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+		//glBindFramebuffer(GL_READ_FRAMEBUFFER, this->gBuffer_.gBufferId);
+		//glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+		//glBlitFramebuffer(0, 0, this->viewPort.width, this->viewPort.height, 0, 0, this->viewPort.width, this->viewPort.height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
 		// Активировать фрейм-буфер (рендеринг во фрейм-буфер)
 		glBindFramebuffer(GL_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
@@ -467,8 +563,9 @@ namespace ogl
 	* \param geometry Шейдер для рендеринга геометрии
 	* \param lightning Шейдер для подсчета освещенности
 	* \param postProcessing Шейдер для пост-обработки
+	* \param shadows Шейдер для построения теневых объемов
 	*/
-	Renderer::Renderer(HWND hwnd, ShaderResourcePtr geometry, ShaderResourcePtr lightning, ShaderResourcePtr postProcessing) :
+	Renderer::Renderer(HWND hwnd, ShaderResourcePtr geometry, ShaderResourcePtr lightning, ShaderResourcePtr postProcessing, ShaderResourcePtr shadows) :
 		hwnd_(hwnd),
 		viewMatrix_(glm::mat4(1)),
 		projectionMatrix_(glm::mat4(1)),
@@ -561,6 +658,7 @@ namespace ogl
 		this->shaders_.shaderLighting_ = lightning;
 		this->shaders_.shaderPostProcessing_ = postProcessing;
 		this->shaders_.shaderSolidColor_ = MakeShaderResource(defaults::GetShaderSource(defaults::DefaultShaderType::SOLID_COLORED));
+		this->shaders_.shaderShadowVolumes_ = shadows;
 	}
 
 	/**
@@ -691,15 +789,27 @@ namespace ogl
 		GLuint lightingShaderID = this->shaders_.shaderLighting_->getId();
 		GLuint postProcessingShaderID = this->shaders_.shaderPostProcessing_->getId();
 		GLuint solidColorShaderID = this->shaders_.shaderSolidColor_->getId();
+		GLuint shadowShaderID = this->shaders_.shaderShadowVolumes_->getId();
 
 		// Отрендерить кадр с геометрией, записать значения положений, нормалей, цветов фрагментов в G-буфер
 		this->renderPassGeometry(geometryShaderID, { 0.0f,0.0f,0.0f,0.0f }, clearMask);
+
+		// Скопировать значения глубины из G-буфера во фрейм-буфер (чтобы объекты не рендерелись поверх всего подряд)
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, this->gBuffer_.gBufferId);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, this->frameBuffer_.frameBufferId);
+		glBlitFramebuffer(0, 0, this->viewPort.width, this->viewPort.height, 0, 0, this->viewPort.width, this->viewPort.height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
 		// Пройти по всем источникам
 		for(unsigned int i = 0; i < this->lights_.size(); i++)
 		{
 			// Если источник установлен и валиден
 			if (this->lights_[i] != nullptr){
+
+				this->renderPassShadows(
+					this->lights_[i],
+					shadowShaderID
+				);
+
 				// Посчитать освещенность для источника, наложить на имеющийся в фрейм-буфере
 				this->renderPassLighting(
 					this->lights_[i],     // Источник
@@ -707,7 +817,7 @@ namespace ogl
 					this->cameraPosition, // Положение камеры
 					clearColor,           // Цвет очистки
 					GL_COLOR_BUFFER_BIT,  // Очищать цветовой буфер
-					i == 0                // Очищать только первый раз
+					i == 0                // Поскольку очистка произведена выше, очищать не нужно
 				);
 			}
 		}
