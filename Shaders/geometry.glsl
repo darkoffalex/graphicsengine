@@ -26,6 +26,7 @@ uniform mat4 projection;
 uniform TextureMapping diffuseTexMapping;
 uniform TextureMapping specularTexMapping;
 uniform TextureMapping bumpTexMapping;
+uniform TextureMapping displaceTextureMapping;
 
 // Выходные значения шейдера
 // Почти все эти значения будут интерполироваться для каждого фрагмента
@@ -35,6 +36,7 @@ out VS_OUT
 	vec2 uvDiffuse;        // Координаты diffuse текстуры
 	vec2 uvSpecular;       // Координаты specular текстуры
 	vec2 uvBump;           // Координаты bump текстуры
+	vec2 uvDisplace;       // Координаты displace (paralax) текстуры
 	vec3 normal;           // Нормаль вершины
 	vec3 vertexPos;        // Положение вершины в мировых координатах
 	vec3 vertexPosLoc;     // Положение вершины в локальных координатах
@@ -69,6 +71,7 @@ void main()
 	vs_out.uvDiffuse = (diffuseTexMapping.rotation * (uv - diffuseTexMapping.origin)) * diffuseTexMapping.scale + diffuseTexMapping.origin + diffuseTexMapping.offset;
 	vs_out.uvSpecular = (specularTexMapping.rotation * (uv - specularTexMapping.origin)) * specularTexMapping.scale + specularTexMapping.origin + specularTexMapping.offset;
 	vs_out.uvBump = (bumpTexMapping.rotation * (uv - bumpTexMapping.origin)) * bumpTexMapping.scale + bumpTexMapping.origin + bumpTexMapping.offset;
+	vs_out.uvDisplace = (displaceTextureMapping.rotation * (uv - displaceTextureMapping.origin)) * displaceTextureMapping.scale + displaceTextureMapping.origin + displaceTextureMapping.offset;
 }
 
 /*VERTEX-SHADER-END*/
@@ -91,6 +94,7 @@ in VS_OUT
 	vec2 uvDiffuse;        // Координаты diffuse текстуры
 	vec2 uvSpecular;       // Координаты specular текстуры
 	vec2 uvBump;           // Координаты bump текстуры
+	vec2 uvDisplace;       // Координаты displace (paralax) текстуры
 	vec3 normal;           // Нормаль вершины
 	vec3 vertexPos;        // Положение вершины в мировых координатах
 	vec3 vertexPosLoc;     // Положение вершины в локальных координатах
@@ -105,10 +109,16 @@ out GS_OUT
 	vec2 uvDiffuse;        // Координаты diffuse текстуры
 	vec2 uvSpecular;       // Координаты specular текстуры
 	vec2 uvBump;           // Координаты bump текстуры
+	vec2 uvDisplace;       // Координаты displace (paralax) текстуры
 	vec3 normal;           // Нормаль вершины
 	vec3 fragmentPos;      // Положение вершины в мировых координатах
 	mat3 tbnMatrix;        // Матрица для преобразования из касательного пространства в мировое
+	vec3 fragmentPosT;     // Положение вершины в координатах касательного пространстве полигона
+	vec3 viewPostT;        // Положение камеры в координатах касательного пространстве полигона
 } gs_out;
+
+// Uniform-переменная для положения камеры
+uniform vec3 cameraPosition;
 
 // Подсчет тангента для полигона
 vec3 CalcTangent(vec3 v0, vec3 v1, vec3 v2, vec2 uv0, vec2 uv1, vec2 uv2)
@@ -174,6 +184,10 @@ void main()
 			vec3 N = gs_in[i].normal;
 			gs_out.tbnMatrix = mat3(T,B,N);
 
+			// Пполучить положение вершины (в дальнейшем фрагмента) и камеры в касательном пространстве полигона
+			gs_out.fragmentPosT = inverse(gs_out.tbnMatrix) * gs_out.fragmentPos;
+			gs_out.viewPostT = inverse(gs_out.tbnMatrix) * cameraPosition;
+
 			// Добавить вершину
 			EmitVertex();
 
@@ -203,25 +217,73 @@ in GS_OUT
 	vec2 uvDiffuse;        // Координаты diffuse текстуры
 	vec2 uvSpecular;       // Координаты specular текстуры
 	vec2 uvBump;           // Координаты bump текстуры
+	vec2 uvDisplace;       // Координаты displace (paralax) текстуры
 	vec3 normal;           // Нормаль вершины
-	vec3 fragmentPos;      // Положение вершины в мировых координатах
+	vec3 fragmentPos;      // Положение фрагмента в мировых координатах
 	mat3 tbnMatrix;        // Матрица для преобразования из касательного пространства в мировое
+	vec3 fragmentPosT;     // Положение вершины в координатах касательного пространстве полигона
+	vec3 viewPostT;        // Положение камеры в координатах касательного пространстве полигона
 } fs_in;
 
 // Текстуры
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
 uniform sampler2D bumpTexture;
+uniform sampler2D displaceTexture;
 
-// Результрующий цвет фрагмента
-//out vec4 color;
+// Текстурные координаты с учетом paralax-mapping смещения
+vec2 paralaxMappedUv(vec2 texCoords, vec3 viewDir)
+{
+	// количество слоев глубины
+    const float numLayers = 16;
+    // размер каждого слоя
+    float layerDepth = 1.0 / numLayers;
+    // глубина текущего слоя
+    float currentLayerDepth = 0.0;
+    // величина шага смещения текстурных координат на каждом слое
+    // расчитывается на основе вектора P
+    vec2 P = viewDir.xy * 0.1f; 
+    vec2 deltaTexCoords = P / numLayers;
+
+	// начальная инициализация
+	vec2  currentTexCoords = texCoords;
+	float currentDepthMapValue = texture(displaceTexture, currentTexCoords).r;
+  
+	while(currentLayerDepth < currentDepthMapValue)
+	{
+		// смещаем текстурные координаты вдоль вектора P
+		currentTexCoords -= deltaTexCoords;
+		// делаем выборку из карты глубин в текущих текстурных координатах 
+		currentDepthMapValue = texture(displaceTexture, currentTexCoords).r;  
+		// рассчитываем глубину следующего слоя
+		currentLayerDepth += layerDepth;  
+	}
+
+	// находим текстурные координаты перед найденной точкой пересечения,
+	// т.е. делаем "шаг назад"
+	vec2 prevTexCoords = currentTexCoords + deltaTexCoords;
+
+	// находим значения глубин до и после нахождения пересечения 
+	// для использования в линейной интерполяции
+	float afterDepth  = currentDepthMapValue - currentLayerDepth;
+	float beforeDepth = texture(displaceTexture, prevTexCoords).r - currentLayerDepth + layerDepth;
+
+	// интерполяция текстурных координат 
+	float weight = afterDepth / (afterDepth - beforeDepth);
+	vec2 finalTexCoords = prevTexCoords * weight + currentTexCoords * (1.0 - weight);
+
+	return finalTexCoords;
+}
 
 // Основная функция фрагментного шейдера
 // Помещение значений положений фрагментов (положение,цвет,бликовость,нормаль) в цветовые вложения g-буфера
 void main()
 {
+	// Направление от фрагмента в камеру (в тангент-пространстве плоскости полигона)
+	vec3 fragToViewDirT = normalize(fs_in.viewPostT - fs_in.fragmentPosT);
+
 	// Получить нормаль из карты нормалей (используя UV коордианты для текущего фрагмента)
-	vec3 normal = normalize(texture(bumpTexture,fs_in.uvBump).rgb * 2.0 - 1.0);
+	vec3 normal = normalize(texture(bumpTexture,paralaxMappedUv(fs_in.uvBump, fragToViewDirT)).rgb * 2.0 - 1.0);
 	// Перевести нормаль из скасательного в мировое пространство
 	normal = fs_in.tbnMatrix * normal;
 
@@ -230,8 +292,8 @@ void main()
 	// Нормаль фрагмента
 	gNormal = normalize(normal);
 	// Цвет фрагмента
-	gAlbedoSpec.rgb = fs_in.color * texture(diffuseTexture, fs_in.uvDiffuse).rgb;
+	gAlbedoSpec.rgb = fs_in.color * texture(diffuseTexture, paralaxMappedUv(fs_in.uvDiffuse, fragToViewDirT)).rgb;
 	// Интенсивность отражения фрагмента
-	gAlbedoSpec.a = texture(specularTexture, fs_in.uvSpecular).r;
+	gAlbedoSpec.a = texture(specularTexture, paralaxMappedUv(fs_in.uvSpecular, fragToViewDirT)).r;
 }
 /*FRAGMENT-SHADER-END*/

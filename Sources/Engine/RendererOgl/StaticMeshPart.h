@@ -37,15 +37,16 @@ namespace ogl
 	class StaticMeshPart
 	{
 	private:
-		StaticGeometryResourcePtr geometry_;  // Ресурс геометрии
+		StaticGeometryResourcePtr geometry_;   // Ресурс геометрии
 
 	public:
-		MaterialSettings material;            // Параметры материала
+		MaterialSettings material;             // Параметры материала
 
-		TextureParameters diffuseTexture;     // Параметры diffuse текстуры
-		TextureParameters detailTexture;      // Параметры detail текстуры
-		TextureParameters specularTexture;    // Параметры specular текстуры
-		TextureParameters bumpTexture;        // Параметры bump текстуры
+		TextureParameters diffuseTexture;      // Параметры diffuse текстуры
+		TextureParameters detailTexture;       // Параметры detail текстуры
+		TextureParameters specularTexture;     // Параметры specular текстуры
+		TextureParameters bumpTexture;         // Параметры bump текстуры
+		TextureParameters displacementTexture; // Параметры displacement текстуры (paralax mapping)
 
 		/**
 		 * \brief Конструктор

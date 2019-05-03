@@ -173,6 +173,9 @@ namespace ogl
 		glUniformMatrix4fv(glGetUniformLocation(shaderID, "projection"), 1, GL_FALSE, glm::value_ptr(this->projectionMatrix_));
 		glUniformMatrix4fv(glGetUniformLocation(shaderID, "view"), 1, GL_FALSE, glm::value_ptr(this->viewMatrix_));
 
+		// Передать положение камеры (для бликов/отражений)
+		glUniform3fv(glGetUniformLocation(shaderID, "cameraPosition"), 1, glm::value_ptr(this->cameraPosition));
+
 		// Включить тест глубины
 		glEnable(GL_DEPTH_TEST);
 
@@ -192,18 +195,21 @@ namespace ogl
 				// Получить структуры коэфициентов маппинга
 				TextureMapping diffuseTextureMapping = { part.diffuseTexture.offset,{ 0.0f,0.0f },part.diffuseTexture.scale,part.diffuseTexture.getRotMatrix() };
 				TextureMapping speculaTextureMapping = { part.specularTexture.offset,{ 0.0f,0.0f },part.specularTexture.scale,part.specularTexture.getRotMatrix() };
-				TextureMapping bumpTextureMapping = { part.bumpTexture.offset,{ 0.0f,0.0f },part.bumpTexture.scale,part.bumpTexture.getRotMatrix() };
+				TextureMapping bumpTextureMapping = { part.bumpTexture.offset,{ 0.0f, 0.0f },part.bumpTexture.scale,part.bumpTexture.getRotMatrix() };
+				TextureMapping displaceTextureMapping = { part.displacementTexture.offset, {0.0f, 0.0f}, part.displacementTexture.scale, part.displacementTexture.getRotMatrix() };
 
 				// Отправить маппинг текстур в шейдер
 				this->texMappingToShader(shaderID, diffuseTextureMapping, "diffuseTexMapping");
 				this->texMappingToShader(shaderID, speculaTextureMapping, "specularTexMapping");
 				this->texMappingToShader(shaderID, bumpTextureMapping, "bumpTexMapping");
+				this->texMappingToShader(shaderID, displaceTextureMapping, "displaceTextureMapping");
 
 
 				// Получить ID'ы текстур (если установлены - их, если нет, тех что по умолчанию)
 				GLuint diffuseTextureId = part.diffuseTexture.resource != nullptr ? part.diffuseTexture.resource->getId() : this->defaultTextures_.diffuse->getId();
 				GLuint specularTextureId = part.specularTexture.resource != nullptr ? part.specularTexture.resource->getId() : this->defaultTextures_.specular->getId();
 				GLuint bumpTextureId = part.bumpTexture.resource != nullptr ? part.bumpTexture.resource->getId() : this->defaultTextures_.bump->getId();
+				GLuint displacementTextureId = part.displacementTexture.resource != nullptr ? part.displacementTexture.resource->getId() : this->defaultTextures_.displace->getId();
 
 				// Активация и передача текстур в шейдер
 				// Diffuse
@@ -226,6 +232,13 @@ namespace ogl
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, part.bumpTexture.wrapS);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, part.bumpTexture.wrapT);
 				glUniform1i(glGetUniformLocation(shaderID, "bumpTexture"), 2);
+
+				// Displacement (paralax)
+				glActiveTexture(GL_TEXTURE3);
+				glBindTexture(GL_TEXTURE_2D, displacementTextureId);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, part.displacementTexture.wrapS);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, part.displacementTexture.wrapT);
+				glUniform1i(glGetUniformLocation(shaderID, "displaceTexture"), 3);
 
 				// Привязать VAO
 				glBindVertexArray(part.getGeometry()->getVaoId());
@@ -647,10 +660,12 @@ namespace ogl
 		// т е к с т у р ы  п о  у м о л ч а н и ю
 
 		GLubyte whitePixel[] = { 255,255,255 }; // белый пиксель
+		GLubyte blackPixel[] = { 0,0,0 };
 		GLubyte bluePixel[] = { 128,128,255 };  // синеватый пиксель, соответствует нормали [0,0,1]
 		this->defaultTextures_.diffuse = MakeTextureResource(whitePixel, 1, 1, 24, false);
 		this->defaultTextures_.specular = MakeTextureResource(whitePixel, 1, 1, 24, false);
 		this->defaultTextures_.bump = MakeTextureResource(bluePixel, 1, 1, 24, false);
+		this->defaultTextures_.displace = MakeTextureResource(blackPixel, 1, 1, 24, false);
 
 		// ш е й д е р ы
 

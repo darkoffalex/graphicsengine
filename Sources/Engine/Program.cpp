@@ -47,6 +47,7 @@ struct{
 		ogl::TextureResourcePtr wallDiffuse;
 		ogl::TextureResourcePtr wallSpecular;
 		ogl::TextureResourcePtr wallBump;
+		ogl::TextureResourcePtr wallDisplace;
 	} textures;
 
 	// Геометрия
@@ -278,12 +279,16 @@ void Load()
 	stbi_image_free(textureBytes);
 
 	// Текстуры стены
-	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall.jpg").c_str(), &width, &height, &bpp, 3);
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\b_diffuse.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallDiffuse = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
-	textureBytes = stbi_load(ExeDir().append("..\\Textures\\brickwall_normal.jpg").c_str(), &width, &height, &bpp, 3);
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\b_normal.jpg").c_str(), &width, &height, &bpp, 3);
 	_sceneResources.textures.wallBump = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
+	stbi_image_free(textureBytes);
+
+	textureBytes = stbi_load(ExeDir().append("..\\Textures\\b_disp.jpg").c_str(), &width, &height, &bpp, 3);
+	_sceneResources.textures.wallDisplace = ogl::MakeTextureResource(textureBytes, static_cast<GLuint>(width), static_cast<GLuint>(height), static_cast<GLuint>(bpp), true);
 	stbi_image_free(textureBytes);
 
 }
@@ -303,12 +308,15 @@ void Init(ogl::Renderer* pRenderer)
 
 	// Добавить к отрисовке стену, настроить текстуру и положение
 	ogl::StaticMeshPtr wallMesh = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.wall)));
-	wallMesh->getParts()[0].diffuseTexture.resource = _sceneResources.textures.wallDiffuse;
-	wallMesh->getParts()[0].diffuseTexture.scale = { 5.0, 5.0f };
+	//wallMesh->getParts()[0].diffuseTexture.resource = _sceneResources.textures.wallDiffuse;
+	//wallMesh->getParts()[0].diffuseTexture.scale = { 5.0, 5.0f };
 	wallMesh->getParts()[0].bumpTexture.resource = _sceneResources.textures.wallBump;
 	wallMesh->getParts()[0].bumpTexture.scale = { 5.0, 5.0f };
+	wallMesh->getParts()[0].displacementTexture.resource = _sceneResources.textures.wallDisplace;
+	//wallMesh->getParts()[0].displacementTexture.scale = { 5.0f, 5.0f };
 	wallMesh->position = { 0.0f,4.0f,-2.0f };
 
+	/*
 	// Добавить к отрисовке цилиндр
 	ogl::StaticMeshPtr cylinder = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cylinder)));
 	cylinder->getParts()[0].diffuseTexture.resource = _sceneResources.textures.wallDiffuse;
@@ -317,8 +325,10 @@ void Init(ogl::Renderer* pRenderer)
 	cylinder->getParts()[0].diffuseTexture.scale = { 3.0f,1.0f };
 	cylinder->getParts()[0].specularTexture.scale = { 3.0f,1.0f };
 	cylinder->getParts()[0].bumpTexture.scale = { 3.0f,1.0f };
+	cylinder->getParts()[0].displacementTexture.resource = _sceneResources.textures.wallDisplace;
 	cylinder->position = { 0.0f,0.0f,-1.0f };
 	cylinder->scale = { 0.3f,0.3f,0.3f };
+	*/
 
 	ogl::StaticMeshPtr cube0 = pRenderer->addStaticMesh(ogl::StaticMesh(ogl::StaticMeshPart(_sceneResources.geometry.cube)));
 	cube0->position = { -2.0f,-0.75f,-1.5f };
@@ -335,7 +345,7 @@ void Init(ogl::Renderer* pRenderer)
 	cube1->scale = { 0.5f,0.5f,0.5f };
 
 	// Добавить источники света, настроить его положение
-	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,1.5f,0.5f }, { 0.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
+	ogl::LightPtr centralLight = pRenderer->addLight(ogl::Light(ogl::LightType::SPOT_LIGHT, { 0.0f,1.5f,0.5f }, { -15.0f,0.0f,0.0f }, { 1.0f,1.0f,1.0f }));
 	ogl::LightPtr light1 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { -2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.7f,0.9f,0.8f }));
 	ogl::LightPtr light2 = pRenderer->addLight(ogl::Light(ogl::LightType::POINT_LIGHT, { 2.0f,-0.3f,1.0f }, { 0.0f,0.0f,0.0f }, { 0.9f,0.8f,0.7f }));
 }
@@ -346,6 +356,7 @@ void Init(ogl::Renderer* pRenderer)
 */
 void Update(float frameDeltaMs)
 {
+	/*
 	static GLfloat lSpeed = 1.0f;
 	static GLfloat rSpeed = -1.0f;
 
@@ -360,9 +371,11 @@ void Update(float frameDeltaMs)
 
 	if (left->position.x > 10.0f || left->position.x < -10.0f) lSpeed *= -1;
 	if (right->position.x > 10.0f || right->position.x < -10.0f) rSpeed *= -1;
+	*/
 
-	_pRenderer->getStaticMeshes()[2]->rotation.y += frameDeltaMs * 0.05f;
-	_pRenderer->getStaticMeshes()[2]->rotation.x += frameDeltaMs * 0.05f;
+	//_pRenderer->getStaticMeshes()[2]->rotation.y += frameDeltaMs * 0.03f;
+	//_pRenderer->getStaticMeshes()[2]->rotation.x += frameDeltaMs * 0.05f;
+	
 
 	// Если есть камера
 	if(_pCamera != nullptr)

@@ -41,6 +41,7 @@ namespace ogl
 		this->detailTexture = defaultParams;
 		this->specularTexture = defaultParams;
 		this->bumpTexture = defaultParams;
+		this->displacementTexture = defaultParams;
 
 		// Назначить параметры материала по умолчанию
 		this->material = defaults::GetMaterialSetings(defaults::DefaultMaterialType::DEFAULT);

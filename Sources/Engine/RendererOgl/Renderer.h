@@ -90,6 +90,7 @@ namespace ogl
 			TextureResourcePtr diffuse;  // Белый пиксель
 			TextureResourcePtr specular; // Балый пиксель
 			TextureResourcePtr bump;     // Синеватный (фиолетовый) пиксель
+			TextureResourcePtr displace; // Белый пиксель
 		} defaultTextures_;
 
 		// О Б Ъ Е К Т Ы  Д Л Я  В И З У А Л И З А Ц И И
